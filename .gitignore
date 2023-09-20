@@ -1,0 +1,16 @@
+.vscode/
+**/.DS_Store
+.DS_Store
+node_modules
+build/
+types/
+cache/
+artifacts/
+out/
+typechain/
+flatten/
+bin/
+coverage*
+.env
+**/.env
+.hypothesis/
