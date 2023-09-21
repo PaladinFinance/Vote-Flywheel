@@ -14,6 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ILootVoteController} from "./interfaces/ILootVoteController.sol";
 import {IHolyPalPower} from "./interfaces/IHolyPalPower.sol";
+import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
 import "./libraries/Errors.sol";
 import "./utils/Owner.sol";
 
@@ -72,7 +73,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     // Storage
 
-    IHolyPalPower public hPalPower;
+    address public hPalPower;
 
     uint256 public nextBoardId; // ID 0 == no ID/not set
 
@@ -92,6 +93,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     mapping(address => uint256) public voteUserPower;
     // Last user vote's timestamp for each gauge address
     mapping(address => mapping(address => uint256)) public lastUserVote;
+
+    mapping(address => mapping(address => IHolyPowerDelegation.SlopeChange[])) public userSlopeChanges;
 
     // gauge_addr -> time -> Point
     mapping(address => mapping(uint256 => Point)) public pointsWeight;
@@ -129,7 +132,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     // Constructor
 
     constructor(address _hPalPower) {
-        hPalPower = IHolyPalPower(_hPalPower);
+        hPalPower = _hPalPower;
 
         nextBoardId++;
     }
@@ -218,8 +221,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         
         vars.currentPeriod = (block.timestamp) / WEEK * WEEK;
         vars.nextPeriod = vars.currentPeriod + WEEK;
-        vars.userSlope = hPalPower.getUserPointAt(user, vars.currentPeriod).slope;
-        vars.userLockEnd = hPalPower.locked__end(user);
+        vars.userSlope = IHolyPowerDelegation(hPalPower).getUserPointAt(user, vars.currentPeriod).slope;
+        vars.userLockEnd = IHolyPowerDelegation(hPalPower).locked__end(user);
 
         if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
@@ -263,14 +266,51 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
             changesWeight[gauge][oldSlope.end] -= oldSlope.slope;
             changesWeightTotal[oldSlope.end] -= oldSlope.slope;
         }
-        changesWeight[gauge][newSlope.end] -= newSlope.slope;
-        changesWeightTotal[newSlope.end] -= newSlope.slope;
+        changesWeight[gauge][newSlope.end] += newSlope.slope;
+        changesWeightTotal[newSlope.end] += newSlope.slope;
+
+        _updateUserSlopeChanges(user, gauge, userPower);
+
         _updateTotalWeight();
 
         voteUserSlopes[user][gauge] = newSlope;
         lastUserVote[user][gauge] = block.timestamp;
 
         emit VoteForGauge(block.timestamp, user, gauge, userPower);
+    }
+
+    function _updateUserSlopeChanges(address user, address gauge, uint256 userPower) internal {
+       IHolyPowerDelegation.SlopeChange[] memory oldUserChanges = userSlopeChanges[user][gauge];
+        uint256 length = oldUserChanges.length;
+        if(length > 0) {
+            for(uint256 i; i < length;) {
+                if(oldUserChanges[i].endTimestamp < block.timestamp) continue;
+
+                changesWeight[gauge][oldUserChanges[i].endTimestamp] -= oldUserChanges[i].slopeChange;
+                changesWeightTotal[oldUserChanges[i].endTimestamp] -= oldUserChanges[i].slopeChange;
+
+                unchecked { ++i; }
+            }
+        }
+
+        delete userSlopeChanges[user][gauge];
+
+        if(userPower == 0) return;
+
+        IHolyPowerDelegation.SlopeChange[] memory newUserChanges = IHolyPowerDelegation(hPalPower).getUserSlopeChanges(user);
+        length = newUserChanges.length;
+        if(length == 0) return;
+
+        for(uint256 i; i < length;) {
+            if(newUserChanges[i].endTimestamp < block.timestamp) continue;
+
+            newUserChanges[i].slopeChange = (newUserChanges[i].slopeChange * userPower) / MAX_BPS;
+
+            changesWeight[gauge][newUserChanges[i].endTimestamp] += newUserChanges[i].slopeChange;
+            changesWeightTotal[newUserChanges[i].endTimestamp] += newUserChanges[i].slopeChange;
+
+            unchecked { ++i; }
+        }
     }
 
     function _getGaugeRelativeWeight(address gauge, uint256 ts) internal view returns(uint256) {
