@@ -2,7 +2,7 @@ const hre = require("hardhat");
 import { ethers } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20__factory } from "../../typechain/factories/oz/interfaces/IERC20__factory";
+import { IERC20__factory } from "../../typechain/factories/@openzeppelin/contracts/token/ERC20/IERC20__factory";
 
 const { provider } = ethers;
 
@@ -15,7 +15,7 @@ export async function resetFork() {
             {
                 forking: {
                     jsonRpcUrl: "https://eth-mainnet.alchemyapi.io/v2/" + (process.env.ALCHEMY_API_KEY || ''),
-                    blockNumber: 0
+                    blockNumber: 18428190
                 },
                 gas: 30000000,
             },

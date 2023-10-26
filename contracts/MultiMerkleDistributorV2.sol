@@ -259,7 +259,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
     function _triggerCreateLoot(address user, uint256 questID, uint256 period, uint256 claimedAmount) internal {
         if(lootCreator != address(0)) {
-            ILootCreator(lootCreator).createLoot(
+            ILootCreator(lootCreator).notifyQuestClaim(
                 user,
                 questID,
                 period,

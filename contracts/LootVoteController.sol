@@ -226,7 +226,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
         if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
-        if(vars.userLockEnd < vars.nextPeriod) revert Errors.VotingCooldown();
+        if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
 
         VotedSlope memory oldSlope = voteUserSlopes[user][gauge];
         if(oldSlope.end > vars.nextPeriod) {

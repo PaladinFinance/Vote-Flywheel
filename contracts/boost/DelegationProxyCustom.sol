@@ -11,13 +11,6 @@ pragma solidity 0.8.20;
 
 import "../utils/Owner.sol";
 
-/** @title Boost Delegation Proxy v2.1 custom contract */
-/// @author Curve, modified by Paladin
-/*
-    TODO
-    Note : not following the mixedCase convention to match Vyper version of BoostV2
-*/
-
 interface HolyPalPower {
 
     struct Point {
@@ -52,8 +45,10 @@ interface VeDelegation {
     // solhint-disable-next-line
     function adjusted_balance_of_at(address _account, uint256 _ts) external view returns(uint256);
 
-    function totalLocked() external view returns(uint256);
-    function totalLockedAt(uint256 blockNumber) external view returns(uint256);
+    // solhint-disable-next-line
+    function total_locked() external view returns(uint256);
+    // solhint-disable-next-line
+    function total_locked_at(uint256 blockNumber) external view returns(uint256);
 
     // solhint-disable-next-line
     function voting_adjusted_balance_of_at(address _user, uint256 _snapshot_ts, uint256 _target_ts) external view returns(uint256);
@@ -62,6 +57,12 @@ interface VeDelegation {
 }
 
 
+/** @title Boost Delegation Proxy v2.1 custom contract */
+/// @author Curve, modified by Paladin
+/*
+    TODO
+    Note : not following the mixedCase convention to match Vyper version of BoostV2
+*/
 contract DelegationProxyCustom is Owner {
 
     // Storage
@@ -135,8 +136,10 @@ contract DelegationProxyCustom is Owner {
 
         uint256 userAdjustedBalance = VeDelegation(_delegation).adjusted_balance_of(user);
 
-        userPoint.slope = convertUint256ToInt128(userAdjustedBalance / (userPoint.endTimestamp - block.timestamp));
-        userPoint.bias = userPoint.slope / convertUint256ToInt128(userPoint.endTimestamp - block.timestamp);
+        if(userPoint.endTimestamp > block.timestamp) {
+            userPoint.slope = convertUint256ToInt128(userAdjustedBalance / (userPoint.endTimestamp - block.timestamp));
+            userPoint.bias = userPoint.slope * convertUint256ToInt128(userPoint.endTimestamp - block.timestamp);
+        }
 
         return userPoint;
 
@@ -149,8 +152,10 @@ contract DelegationProxyCustom is Owner {
 
         uint256 userAdjustedBalance = VeDelegation(_delegation).adjusted_balance_of_at(user, timestamp);
 
-        userPoint.slope = convertUint256ToInt128(userAdjustedBalance / (userPoint.endTimestamp - timestamp));
-        userPoint.bias = userPoint.slope / convertUint256ToInt128(userPoint.endTimestamp - timestamp);
+        if(userPoint.endTimestamp > timestamp) {
+            userPoint.slope = convertUint256ToInt128(userAdjustedBalance / (userPoint.endTimestamp - timestamp));
+            userPoint.bias = userPoint.slope * convertUint256ToInt128(userPoint.endTimestamp - timestamp);
+        }
 
         return userPoint;
     }

@@ -18,8 +18,8 @@ interface VeDelegation: # Boost V2
     def adjusted_balance_of(_account: address) -> uint256: view
     def adjusted_balance_of_at(_account: address, _ts: uint256) -> uint256: view
 
-    def totalLocked() -> uint256: view
-    def totalLockedAt(blockNumber: uint256) -> uint256: view
+    def total_locked() -> uint256: view
+    def total_locked_at(block_number: uint256) -> uint256: view
 
 
 event CommitAdmins:

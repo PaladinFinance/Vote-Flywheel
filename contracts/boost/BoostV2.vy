@@ -28,6 +28,8 @@ interface HolyPalPower:
     def balanceOfAt(_user: address, _timestamp: uint256) -> uint256: view
     def totalSupply() -> uint256: view
     def locked__end(_user: address) -> uint256: view
+    def totalLocked() -> uint256: view
+    def totalLockedAt(blockNumber: uint256) -> uint256: view
 
 
 struct Point:
@@ -40,7 +42,7 @@ NAME: constant(String[32]) = "HolyPal Power Boost"
 SYMBOL: constant(String[9]) = "hPalBoost"
 VERSION: constant(String[8]) = "v2.0.0"
 
-EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
+EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 WEEK: constant(uint256) = 86400 * 7
@@ -66,7 +68,7 @@ received_checkpoints_nonces: public(HashMap[address, uint256])
 
 @external
 def __init__(_ve: address):
-    DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
+    DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self))
     HOLY_PAL_POWER = _ve
 
     log Transfer(ZERO_ADDRESS, msg.sender, 0)
@@ -86,7 +88,7 @@ def _find_delegated_point(_user: address, _ts: uint256 = block.timestamp) -> Poi
     if user_nonce == 0:
         return empty_point
 
-    if self.delegated_checkpoints_dates[_user][0] <= _ts:
+    if self.delegated_checkpoints_dates[_user][0] > _ts:
         return empty_point
 
     if self.delegated_checkpoints_dates[_user][user_nonce - 1] <= _ts:
@@ -126,7 +128,7 @@ def _find_received_point(_user: address, _ts: uint256 = block.timestamp) -> Poin
     if user_nonce == 0:
         return empty_point
 
-    if self.received_checkpoints_dates[_user][0] <= _ts:
+    if self.received_checkpoints_dates[_user][0] > _ts:
         return empty_point
 
     if self.received_checkpoints_dates[_user][user_nonce - 1] <= _ts:
@@ -292,10 +294,10 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
 
     # store updated values
     delegated_nonce = self.delegated_checkpoints_nonces[_from]
-    self.delegated_checkpoints_nonces[_from] = delegated_nonce + 1
     self.delegated[_from][delegated_nonce] = point
     self.delegated_slope_changes[_from][_endtime] += slope
-    self.delegated_checkpoints_dates[_from][received_nonce] = block.timestamp
+    self.delegated_checkpoints_dates[_from][delegated_nonce] = block.timestamp
+    self.delegated_checkpoints_nonces[_from] = delegated_nonce + 1
 
     # update received amount
     point = self._checkpoint_write(_to, False)
@@ -304,23 +306,23 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
 
     # store updated values
     received_nonce = self.received_checkpoints_nonces[_to]
-    self.received_checkpoints_nonces[_to] = received_nonce + 1
     self.received[_to][received_nonce] = point
     self.received_slope_changes[_to][_endtime] += slope
     self.received_checkpoints_dates[_to][received_nonce] = block.timestamp
+    self.received_checkpoints_nonces[_to] = received_nonce + 1
 
     log Transfer(_from, _to, _amount)
     log Boost(_from, _to, bias, slope, block.timestamp)
 
     # also checkpoint received and delegated
     delegated_nonce = self.delegated_checkpoints_nonces[_to]
-    self.delegated_checkpoints_nonces[_to] = delegated_nonce + 1
     received_nonce = self.received_checkpoints_nonces[_from]
-    self.received_checkpoints_nonces[_from] = received_nonce + 1
     self.received[_from][received_nonce] = self._checkpoint_write(_from, False)
     self.delegated[_to][delegated_nonce] = self._checkpoint_write(_to, True)
     self.received_checkpoints_dates[_from][received_nonce] = block.timestamp
-    self.delegated_checkpoints_dates[_to][received_nonce] = block.timestamp
+    self.delegated_checkpoints_dates[_to][delegated_nonce] = block.timestamp
+    self.delegated_checkpoints_nonces[_to] = delegated_nonce + 1
+    self.received_checkpoints_nonces[_from] = received_nonce + 1
 
 
 @external
@@ -338,12 +340,14 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
 @external
 def checkpoint_user(_user: address):
     delegated_nonce: uint256 = self.delegated_checkpoints_nonces[_user]
-    self.delegated_checkpoints_nonces[_user] = delegated_nonce + 1
     self.delegated[_user][delegated_nonce] = self._checkpoint_write(_user, True)
+    self.delegated_checkpoints_dates[_user][delegated_nonce] = block.timestamp
+    self.delegated_checkpoints_nonces[_user] = delegated_nonce + 1
     
     received_nonce: uint256 = self.received_checkpoints_nonces[_user]
-    self.received_checkpoints_nonces[_user] = received_nonce + 1
     self.received[_user][received_nonce] = self._checkpoint_write(_user, False)
+    self.received_checkpoints_dates[_user][received_nonce] = block.timestamp
+    self.received_checkpoints_nonces[_user] = received_nonce + 1
 
 
 @external
@@ -465,7 +469,19 @@ def voting_adjusted_balance_of_at(_user: address, _snapshot_ts: uint256, _target
 @view
 @external
 def totalSupply() -> uint256:
-    return HolyPalPower(HOLY_PAL_POWER).totalSupply()
+    return HolyPalPower(HOLY_PAL_POWER).totalLocked()
+
+
+@view
+@external
+def total_locked() -> uint256:
+    return HolyPalPower(HOLY_PAL_POWER).totalLocked()
+
+
+@view
+@external
+def total_locked_at(block_number: uint256) -> uint256:
+    return HolyPalPower(HOLY_PAL_POWER).totalLockedAt(block_number)
 
 
 @view
@@ -487,6 +503,24 @@ def received_balance(_user: address) -> uint256:
 def delegable_balance(_user: address) -> uint256:
     point: Point = self._checkpoint_read(_user, True)
     return HolyPalPower(HOLY_PAL_POWER).balanceOf(_user) - (point.bias - point.slope * (block.timestamp - point.ts))
+
+
+@view
+@external
+def delegated_point(_user: address) -> Point:
+    user_nonce: uint256 = self.delegated_checkpoints_nonces[_user]
+    if user_nonce == 0:
+        return empty(Point)
+    return self.delegated[_user][user_nonce - 1]
+
+
+@view
+@external
+def received_point(_user: address) -> Point:
+    user_nonce: uint256 = self.received_checkpoints_nonces[_user]
+    if user_nonce == 0:
+        return empty(Point)
+    return self.received[_user][user_nonce - 1]
 
 
 @pure

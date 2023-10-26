@@ -87,6 +87,12 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     mapping(uint256 => uint256) public periodBlockCheckpoint;
 
+    // id -> period -> total
+    mapping(uint256 => mapping(uint256 => uint256)) public totalQuestPeriodRewards;
+    mapping(uint256 => mapping(uint256 => bool)) public totalQuestPeriodSet;
+    // id -> period -> user -> amount
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public userQuestPeriodRewards;
+
 
     // Events
 
@@ -165,42 +171,27 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // State-changing functions
 
-    function createLoot(address user, uint256 questId, uint256 period, uint256 claimedAmount, uint256 totalAmount) external onlyAllowedDistributor nonReentrant {
-        CreateVars memory vars;
-        
-        vars.gauge = _getQuestGauge(questId, msg.sender);
-        if(!ILootVoteController(lootVoteController).isListedGauge(vars.gauge)) return;
+    function createLoot(address user, uint256 questId, uint256 period) external onlyAllowedDistributor nonReentrant {
+        _createLoot(user, questId, period);
+    }
 
-        // get Quest allocation
-        Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, nextPeriod);
+    struct MultiCreate {
+        uint256 questId;
+        uint256 period;
+    }
 
-        // get user boost power and total power
-        vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
-        vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
+    function createMultipleLoot(address user, MultiCreate[] calldata params) external onlyAllowedDistributor nonReentrant {
+        uint256 length = params.length;
+        if(length == 0) revert Errors.EmptyParameters();
 
-        // calculate ratios based on that
-        vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
-        vars.rewardRatio = (claimedAmount * UNIT) / totalAmount;
-        if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
+        for(uint256 i; i < length; i++){
+            _createLoot(user, params[i].questId, params[i].period);
+        }
+    }
 
-        vars.userMultiplier = BASE_MULTIPLIER + (vars.totalRatio * (MAX_MULTIPLIER - BASE_MULTIPLIER) / UNIT);
-        if(vars.userMultiplier > MAX_MULTIPLIER) vars.userMultiplier = MAX_MULTIPLIER; // don't want to go higher than the max
-
-        // calculate user undistributed rewards
-        vars.userPalAmount = uint256(allocation.palPerVote) * vars.userMultiplier / UNIT;
-        vars.userExtraAmount = uint256(allocation.extraPerVote) * vars.userMultiplier / UNIT;
-
-        // Retrieve unallocated rewards
-        pengingBudget.palAmount += uint128(
-            (uint256(allocation.palPerVote) * MAX_MULTIPLIER / UNIT) - vars.userPalAmount
-        );
-        pengingBudget.extraAmount += uint128(
-            (uint256(allocation.extraPerVote) * MAX_MULTIPLIER / UNIT) - vars.userExtraAmount
-        );
-
-        // create the Loot
-        Loot(loot).createLoot(user, period, vars.userPalAmount, vars.userExtraAmount);
-
+    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount, uint256 totalAmount) external onlyAllowedDistributor nonReentrant {
+        if(!totalQuestPeriodSet[questId][period]) totalQuestPeriodRewards[questId][period] = totalAmount;
+        userQuestPeriodRewards[questId][period][user] = claimedAmount;
     }
 
     function notifyDistributedQuestPeriod(uint256 questId, uint256 period, uint256 totalRewards) external onlyAllowedDistributor nonReentrant {
@@ -248,7 +239,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     }
 
 	function notifyNewBudget(uint256 palAmount, uint256 extraAmount) external onlyGauge {
-
+        pengingBudget.palAmount += uint128(palAmount);
+        pengingBudget.extraAmount += uint128(extraAmount);
     }
 
 
@@ -292,6 +284,44 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         pending.extraAmount += currentBudget.extraAmount - previousSpent.extraAmount;
 
         currentBudget = pending;
+    }
+
+    function _createLoot(address user, uint256 questId, uint256 period) internal {
+        CreateVars memory vars;
+        
+        vars.gauge = _getQuestGauge(questId, msg.sender);
+        if(!ILootVoteController(lootVoteController).isListedGauge(vars.gauge)) return;
+
+        // get Quest allocation
+        Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, nextPeriod);
+
+        // get user boost power and total power
+        vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
+        vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
+
+        // calculate ratios based on that
+        vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
+        vars.rewardRatio = (userQuestPeriodRewards[questId][period][user] * UNIT) / totalQuestPeriodRewards[questId][period];
+        if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
+
+        vars.userMultiplier = BASE_MULTIPLIER + (vars.totalRatio * (MAX_MULTIPLIER - BASE_MULTIPLIER) / UNIT);
+        if(vars.userMultiplier > MAX_MULTIPLIER) vars.userMultiplier = MAX_MULTIPLIER; // don't want to go higher than the max
+
+        // calculate user undistributed rewards
+        vars.userPalAmount = uint256(allocation.palPerVote) * vars.userMultiplier / UNIT;
+        vars.userExtraAmount = uint256(allocation.extraPerVote) * vars.userMultiplier / UNIT;
+
+        // Retrieve unallocated rewards
+        pengingBudget.palAmount += uint128(
+            (uint256(allocation.palPerVote) * MAX_MULTIPLIER / UNIT) - vars.userPalAmount
+        );
+        pengingBudget.extraAmount += uint128(
+            (uint256(allocation.extraPerVote) * MAX_MULTIPLIER / UNIT) - vars.userExtraAmount
+        );
+
+        // create the Loot
+        Loot(loot).createLoot(user, period, vars.userPalAmount, vars.userExtraAmount);
+
     }
 
 

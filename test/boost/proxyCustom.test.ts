@@ -2,7 +2,7 @@ const hre = require("hardhat");
 import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { DelegationProxy } from "../../typechain/contracts/boost/DelegationProxy.vy/DelegationProxy";
+import { DelegationProxyCustom } from "../../typechain/contracts/boost/DelegationProxyCustom.sol/DelegationProxyCustom";
 import { MockBoost } from "../../typechain/contracts/test/MockBoost";
 import { MockPalPower } from "../../typechain/contracts/test/MockPalPower";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -18,21 +18,19 @@ chai.use(solidity);
 const { expect } = chai;
 const { provider } = ethers;
 
+const WEEK = BigNumber.from(86400 * 7)
+
 let proxyFactory: ContractFactory
 let boostFactory: ContractFactory
 let escrowFactory: ContractFactory
 
-describe('Delegation Proxy contract tests', () => {
+describe('DelegationProxyCustom contract tests', () => {
     let admin: SignerWithAddress
-    let emergencyAdmin: SignerWithAddress
 
-    let proxy: DelegationProxy
+    let proxy: DelegationProxyCustom
 
     let user: SignerWithAddress
     let otherUser: SignerWithAddress
-    
-    let new_admin: SignerWithAddress
-    let new_emergencyAdmin: SignerWithAddress
 
     let escrow: MockPalPower
 
@@ -41,9 +39,9 @@ describe('Delegation Proxy contract tests', () => {
     before(async () => {
         await resetFork();
 
-        [admin, emergencyAdmin, user, otherUser, new_admin, new_emergencyAdmin] = await ethers.getSigners();
+        [admin, user, otherUser] = await ethers.getSigners();
 
-        proxyFactory = await ethers.getContractFactory("DelegationProxy");
+        proxyFactory = await ethers.getContractFactory("DelegationProxyCustom");
         escrowFactory = await ethers.getContractFactory("MockPalPower");
         boostFactory = await ethers.getContractFactory("MockBoost");
 
@@ -59,10 +57,8 @@ describe('Delegation Proxy contract tests', () => {
 
         proxy = (await proxyFactory.connect(admin).deploy(
             escrow.address,
-            boost.address,
-            admin.address,
-            emergencyAdmin.address
-        )) as DelegationProxy
+            boost.address
+        )) as DelegationProxyCustom
         await proxy.deployed()
 
     });
@@ -72,10 +68,7 @@ describe('Delegation Proxy contract tests', () => {
 
         expect(await proxy.delegation()).to.be.eq(boost.address)
         
-        expect(await proxy.ownership_admin()).to.be.eq(admin.address)
-        expect(await proxy.emergency_admin()).to.be.eq(emergencyAdmin.address)
-        expect(await proxy.future_emergency_admin()).to.be.eq(ethers.constants.AddressZero)
-        expect(await proxy.future_ownership_admin()).to.be.eq(ethers.constants.AddressZero)
+        expect(await proxy.owner()).to.be.eq(admin.address)
 
     });
 
@@ -180,6 +173,182 @@ describe('Delegation Proxy contract tests', () => {
 
     });
 
+    describe('locked__end', async () => {
+
+        const lock_end = 17525000
+
+        beforeEach(async () => {
+
+            await escrow.connect(admin).setLockedEnd(user.address, lock_end)
+
+        });
+
+        it(' should return the correct data', async () => {
+
+            expect(await proxy.locked__end(user.address)).to.be.eq(lock_end)
+
+        });
+
+    });
+
+    describe('getUserSlopeChanges', async () => {
+
+        const changes = [
+            {
+                slopeChange: ethers.utils.parseEther("0.01"),
+                endTimestamp: BigNumber.from(17589000)
+            },
+            {
+                slopeChange: ethers.utils.parseEther("0.025"),
+                endTimestamp: BigNumber.from(17592000)
+            },
+            {
+                slopeChange: ethers.utils.parseEther("0.005"),
+                endTimestamp: BigNumber.from(17788000)
+            }
+        ]
+
+        beforeEach(async () => {
+
+            await boost.connect(admin).setUserSlopeChanges(user.address, changes)
+
+        });
+
+        it(' should return the correct data', async () => {
+
+            const received_changes = await proxy.getUserSlopeChanges(user.address)
+            
+            expect(received_changes.length).to.be.eq(changes.length)
+
+            for(let i = 0; i < received_changes.length; i++) {
+                expect(received_changes[i].slopeChange).to.be.eq(changes[i].slopeChange)
+                expect(received_changes[i].endTimestamp).to.be.eq(changes[i].endTimestamp)
+            }
+
+        });
+
+        it(' should return an empty array if no delegation set', async () => {
+
+            await proxy.connect(admin).kill_delegation()
+
+            expect(await proxy.getUserSlopeChanges(user.address)).to.be.eql([])
+
+        });
+
+    });
+
+    describe('getUserPoint', async () => {
+
+        const user_bias = ethers.utils.parseEther("5000")
+        const user_slope = ethers.utils.parseEther("0.25")
+        let user_end_ts = BigNumber.from(0)
+        const user_block = BigNumber.from(15489)
+
+        const user_adjusted_balance = ethers.utils.parseEther("2100")
+
+        beforeEach(async () => {
+
+            await boost.connect(admin).setAdjustedBalance(user.address, user_adjusted_balance)
+            
+            const current_ts = BigNumber.from((await ethers.provider.getBlock(
+                await ethers.provider.getBlockNumber()
+            )).timestamp)
+            user_end_ts = current_ts.add(WEEK.mul(50))
+
+            await escrow.connect(admin).setUserPoint(user.address, user_bias, user_slope, user_end_ts, user_block)
+
+        });
+
+        it(' should return the correct point with adjsuted balance', async () => {
+            
+            const current_ts = BigNumber.from((await ethers.provider.getBlock(
+                await ethers.provider.getBlockNumber()
+            )).timestamp)
+
+            const expected_slope = user_adjusted_balance.div(user_end_ts.sub(current_ts))
+            const expected_bias = expected_slope.mul(user_end_ts.sub(current_ts))
+
+            const received_point = await proxy.getUserPoint(user.address)
+
+            expect(received_point.bias).to.be.eq(expected_bias)
+            expect(received_point.slope).to.be.eq(expected_slope)
+            expect(received_point.endTimestamp).to.be.eq(user_end_ts)
+            expect(received_point.blockNumber).to.be.eq(user_block)
+
+        });
+
+        it(' should return the normal point if no delegation set', async () => {
+
+            await proxy.connect(admin).kill_delegation()
+
+            const received_point = await proxy.getUserPoint(user.address)
+
+            expect(received_point.bias).to.be.eq(user_bias)
+            expect(received_point.slope).to.be.eq(user_slope)
+            expect(received_point.endTimestamp).to.be.eq(user_end_ts)
+            expect(received_point.blockNumber).to.be.eq(user_block)
+
+        });
+
+    });
+
+    describe('getUserPointAt', async () => {
+
+        const user_bias = ethers.utils.parseEther("6000")
+        const user_slope = ethers.utils.parseEther("0.525")
+        let user_end_ts = BigNumber.from(0)
+        const user_block = BigNumber.from(15489)
+
+        const user_adjusted_balance = ethers.utils.parseEther("3200")
+
+        let target_ts = BigNumber.from(0)
+
+        beforeEach(async () => {
+            
+            const current_ts = BigNumber.from((await ethers.provider.getBlock(
+                await ethers.provider.getBlockNumber()
+            )).timestamp)
+            user_end_ts = current_ts.add(WEEK.mul(50))
+
+            target_ts = current_ts.sub(WEEK.mul(2))
+
+            await boost.connect(admin).setAdjustedBalanceAt(user.address, target_ts, user_adjusted_balance)
+
+            await escrow.connect(admin).setUserPointAt(user.address, target_ts, user_bias, user_slope, user_end_ts, user_block)
+
+        });
+
+        it(' should return the correct point with adjsuted balance', async () => {
+
+            const expected_slope = user_adjusted_balance.div(user_end_ts.sub(target_ts))
+            const expected_bias = expected_slope.mul(user_end_ts.sub(target_ts))
+
+            const received_point = await proxy.getUserPointAt(user.address, target_ts)
+
+            expect(received_point.bias).to.be.eq(expected_bias)
+            expect(received_point.slope).to.be.eq(expected_slope)
+            expect(received_point.endTimestamp).to.be.eq(user_end_ts)
+            expect(received_point.blockNumber).to.be.eq(user_block)
+
+        });
+
+        it(' should return the normal point if no delegation set', async () => {
+
+            await proxy.connect(admin).kill_delegation()
+
+            const received_point = await proxy.getUserPointAt(user.address, target_ts)
+
+            expect(received_point.bias).to.be.eq(user_bias)
+            expect(received_point.slope).to.be.eq(user_slope)
+            expect(received_point.endTimestamp).to.be.eq(user_end_ts)
+            expect(received_point.blockNumber).to.be.eq(user_block)
+
+        });
+
+    });
+
+    // other methods here
+
     describe('kill_delegation', async () => {
 
         it(' should remove the delegation correctly', async () => {
@@ -187,18 +356,6 @@ describe('Delegation Proxy contract tests', () => {
             expect(await proxy.delegation()).to.be.eq(boost.address)
 
             const kill_tx = await proxy.connect(admin).kill_delegation()
-
-            expect(await proxy.delegation()).to.be.eq(ethers.constants.AddressZero)
-
-            expect(kill_tx).to.emit(proxy, "DelegationSet").withArgs(ethers.constants.AddressZero);
-
-        });
-
-        it(' should also be callable by the emergency admin', async () => {
-
-            expect(await proxy.delegation()).to.be.eq(boost.address)
-
-            const kill_tx = await proxy.connect(emergencyAdmin).kill_delegation()
 
             expect(await proxy.delegation()).to.be.eq(ethers.constants.AddressZero)
 
@@ -261,10 +418,8 @@ describe('Delegation Proxy contract tests', () => {
 
             const proxy2 = (await proxyFactory.connect(admin).deploy(
                 escrow.address,
-                ethers.constants.AddressZero,
-                admin.address,
-                emergencyAdmin.address
-            )) as DelegationProxy
+                ethers.constants.AddressZero
+            )) as DelegationProxyCustom
             await proxy2.deployed()
 
             expect(await proxy2.delegation()).to.be.eq(ethers.constants.AddressZero)
@@ -288,77 +443,11 @@ describe('Delegation Proxy contract tests', () => {
         it(' should only be allowed for ownership admin', async () => {
 
             await expect(
-                proxy.connect(emergencyAdmin).set_delegation(new_boost.address)
+                proxy.connect(user).set_delegation(new_boost.address)
             ).to.be.reverted
 
             await expect(
                 proxy.connect(otherUser).set_delegation(new_boost.address)
-            ).to.be.reverted
-
-        });
-
-    });
-
-    describe('commit_set_admins', async () => {
-
-        it(' should set the future admins correctly', async () => {
-            
-            expect(await proxy.future_emergency_admin()).to.be.eq(ethers.constants.AddressZero)
-            expect(await proxy.future_ownership_admin()).to.be.eq(ethers.constants.AddressZero)
-
-            const update_tx = await proxy.connect(admin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
-            
-            expect(await proxy.future_emergency_admin()).to.be.eq(new_emergencyAdmin.address)
-            expect(await proxy.future_ownership_admin()).to.be.eq(new_admin.address)
-
-            expect(update_tx).to.emit(proxy, "CommitAdmins").withArgs(new_admin.address, new_emergencyAdmin.address);
-
-        });
-
-        it(' should only be allowed for ownership admin', async () => {
-
-            await expect(
-                proxy.connect(emergencyAdmin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
-            ).to.be.reverted
-
-            await expect(
-                proxy.connect(otherUser).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
-            ).to.be.reverted
-
-        });
-
-    });
-
-    describe('apply_set_admins', async () => {
-
-        beforeEach(async () => {
-
-            await proxy.connect(admin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
-
-        });
-
-        it(' should apply the new admins', async () => {
-
-            expect(await proxy.ownership_admin()).to.be.eq(admin.address)
-            expect(await proxy.emergency_admin()).to.be.eq(emergencyAdmin.address)
-
-            const update_tx = await proxy.connect(admin).apply_set_admins()
-
-            expect(await proxy.ownership_admin()).to.be.eq(new_admin.address)
-            expect(await proxy.emergency_admin()).to.be.eq(new_emergencyAdmin.address)
-
-            expect(update_tx).to.emit(proxy, "ApplyAdmins").withArgs(new_admin.address, new_emergencyAdmin.address);
-
-        });
-
-        it(' should only be allowed for ownership admin', async () => {
-
-            await expect(
-                proxy.connect(emergencyAdmin).apply_set_admins()
-            ).to.be.reverted
-
-            await expect(
-                proxy.connect(otherUser).apply_set_admins()
             ).to.be.reverted
 
         });

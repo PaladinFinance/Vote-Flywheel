@@ -2,7 +2,7 @@ const hre = require("hardhat");
 import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { BoostV2 } from "../../typechain/contracts/boost/BoostV2.vy/BoostV2";
+import { BoostV2Custom } from "../../typechain/contracts/boost/BoostV2Custom.sol/BoostV2Custom";
 import { MockPalPower } from "../../typechain/contracts/test/MockPalPower";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ContractFactory } from "@ethersproject/contracts";
@@ -30,11 +30,11 @@ const lock_amount2 = ethers.utils.parseEther('1200')
 const lock_duration = MAX_TIME
 const lock_duration2 = WEEK.mul(200)
 
-describe('BoostV2 contract tests', () => {
+describe('BoostV2Custom contract tests', () => {
     let admin: SignerWithAddress
     let emergencyAdmin: SignerWithAddress
 
-    let boost: BoostV2
+    let boost: BoostV2Custom
 
     let user1: SignerWithAddress
     let user2: SignerWithAddress
@@ -48,7 +48,7 @@ describe('BoostV2 contract tests', () => {
         [admin, user1, user2, user3] = await ethers.getSigners();
 
         escrowFactory = await ethers.getContractFactory("MockPalPower");
-        boostFactory = await ethers.getContractFactory("BoostV2");
+        boostFactory = await ethers.getContractFactory("BoostV2Custom");
 
     })
 
@@ -59,7 +59,7 @@ describe('BoostV2 contract tests', () => {
 
         boost = (await boostFactory.connect(admin).deploy(
             holyPalPower.address,
-        )) as BoostV2
+        )) as BoostV2Custom
         await boost.deployed()
 
     });
@@ -68,8 +68,8 @@ describe('BoostV2 contract tests', () => {
         expect(boost.address).to.properAddress
 
         expect(await boost.HOLY_PAL_POWER()).to.be.equal(holyPalPower.address)
-        expect(await boost.name()).to.be.equal("HolyPal Power Boost")
-        expect(await boost.symbol()).to.be.equal("hPalBoost")
+        expect(await boost.name()).to.be.equal("HolyPal Power Boost 2")
+        expect(await boost.symbol()).to.be.equal("hPalBoost2")
         expect(await boost.decimals()).to.be.equal(18)
     });
 
@@ -207,7 +207,7 @@ describe('BoostV2 contract tests', () => {
 
         const boost_amount = ethers.utils.parseEther('1000')
 
-        const duration = WEEK.mul(200)
+        const duration = WEEK.mul(100)
 
         let end_time: BigNumber;
 
@@ -229,14 +229,16 @@ describe('BoostV2 contract tests', () => {
             const prev_delegeable_balance = await boost.delegable_balance(user1.address)
             const prev_received_balance = await boost.received_balance(user2.address)
 
-            const prev_user1_slope_changes = await boost.delegated_slope_changes(user1.address, end_time)
-            const prev_user2_slope_changes = await boost.received_slope_changes(user2.address, end_time)
+            const prev_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const prev_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
 
-            const prev_user1_delegated_nonce = await boost.delegated_checkpoints_nonces(user1.address)
-            const prev_user2_received_nonce = await boost.received_checkpoints_nonces(user2.address)
+            const prev_user1_delegated_nonce = await boost.delegatedCheckpointsNonces(user1.address)
+            const prev_user2_received_nonce = await boost.receivedCheckpointsNonces(user2.address)
 
-            const prev_user2_delegated_nonce = await boost.delegated_checkpoints_nonces(user2.address)
-            const prev_user1_received_nonce = await boost.received_checkpoints_nonces(user1.address)
+            const prev_user2_delegated_nonce = await boost.delegatedCheckpointsNonces(user2.address)
+            const prev_user1_received_nonce = await boost.receivedCheckpointsNonces(user1.address)
+
+            const prev_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
 
             const boost_tx = await boost.connect(user1)["boost(address,uint256,uint256)"](
                 user2.address,
@@ -250,8 +252,8 @@ describe('BoostV2 contract tests', () => {
             const user1_point = await boost.delegated_point(user1.address)
             const user2_point = await boost.received_point(user2.address)
 
-            const new_user1_slope_changes = await boost.delegated_slope_changes(user1.address, end_time)
-            const new_user2_slope_changes = await boost.received_slope_changes(user2.address, end_time)
+            const new_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const new_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
 
             const new_adjusted_balance1 = await boost.adjusted_balance_of(user1.address, { blockTag: tx_block })
             const new_adjusted_balance2 = await boost.adjusted_balance_of(user2.address, { blockTag: tx_block })
@@ -281,17 +283,26 @@ describe('BoostV2 contract tests', () => {
             expect(new_delegeable_balance).to.be.equal(prev_delegeable_balance.sub(expected_bias))
             expect(new_received_balance).to.be.equal(prev_received_balance.add(expected_bias))
 
-            expect(await boost.delegated_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_dates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts)
-            expect(await boost.received_checkpoints_dates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts)
 
-            expect(await boost.received_checkpoints_dates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts)
-            expect(await boost.delegated_checkpoints_dates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts)
+
+            const new_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
+
+            expect(new_user2_receiver_slope_changes.length).to.be.equal(prev_user2_receiver_slope_changes.length + 1)
+
+            const new_receiver_slope_change = new_user2_receiver_slope_changes[new_user2_receiver_slope_changes.length - 1]
+
+            expect(new_receiver_slope_change.slopeChange).to.be.equal(expected_slope)
+            expect(new_receiver_slope_change.endTimestamp).to.be.equal(end_time)
 
             expect(boost_tx).to.emit(boost, "Transfer").withArgs(
                 user1.address,
@@ -405,14 +416,16 @@ describe('BoostV2 contract tests', () => {
             const prev_delegeable_balance = await boost.delegable_balance(user1.address)
             const prev_received_balance = await boost.received_balance(user2.address)
 
-            const prev_user1_slope_changes = await boost.delegated_slope_changes(user1.address, end_time)
-            const prev_user2_slope_changes = await boost.received_slope_changes(user2.address, end_time)
+            const prev_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const prev_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
 
-            const prev_user1_delegated_nonce = await boost.delegated_checkpoints_nonces(user1.address)
-            const prev_user2_received_nonce = await boost.received_checkpoints_nonces(user2.address)
+            const prev_user1_delegated_nonce = await boost.delegatedCheckpointsNonces(user1.address)
+            const prev_user2_received_nonce = await boost.receivedCheckpointsNonces(user2.address)
 
-            const prev_user2_delegated_nonce = await boost.delegated_checkpoints_nonces(user2.address)
-            const prev_user1_received_nonce = await boost.received_checkpoints_nonces(user1.address)
+            const prev_user2_delegated_nonce = await boost.delegatedCheckpointsNonces(user2.address)
+            const prev_user1_received_nonce = await boost.receivedCheckpointsNonces(user1.address)
+
+            const prev_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
 
             const boost_tx = await boost.connect(user2)["boost(address,uint256,uint256,address)"](
                 user2.address,
@@ -431,8 +444,8 @@ describe('BoostV2 contract tests', () => {
             const user1_point = await boost.delegated_point(user1.address)
             const user2_point = await boost.received_point(user2.address)
 
-            const new_user1_slope_changes = await boost.delegated_slope_changes(user1.address, end_time)
-            const new_user2_slope_changes = await boost.received_slope_changes(user2.address, end_time)
+            const new_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const new_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
 
             const new_adjusted_balance1 = await boost.adjusted_balance_of(user1.address, { blockTag: tx_block })
             const new_adjusted_balance2 = await boost.adjusted_balance_of(user2.address, { blockTag: tx_block })
@@ -462,17 +475,26 @@ describe('BoostV2 contract tests', () => {
             expect(new_delegeable_balance).to.be.equal(prev_delegeable_balance.sub(expected_bias))
             expect(new_received_balance).to.be.equal(prev_received_balance.add(expected_bias))
 
-            expect(await boost.delegated_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_dates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts)
-            expect(await boost.received_checkpoints_dates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts)
 
-            expect(await boost.received_checkpoints_dates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts)
-            expect(await boost.delegated_checkpoints_dates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts)
+
+            const new_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
+
+            expect(new_user2_receiver_slope_changes.length).to.be.equal(prev_user2_receiver_slope_changes.length + 1)
+
+            const new_receiver_slope_change = new_user2_receiver_slope_changes[new_user2_receiver_slope_changes.length - 1]
+
+            expect(new_receiver_slope_change.slopeChange).to.be.equal(expected_slope)
+            expect(new_receiver_slope_change.endTimestamp).to.be.equal(end_time)
 
             expect(boost_tx).to.emit(boost, "Transfer").withArgs(
                 user1.address,
@@ -522,6 +544,122 @@ describe('BoostV2 contract tests', () => {
 
         });
 
+        it(' should re-delegate correctly & clear previous slope changes', async () => {
+
+            await boost.connect(user1)["boost(address,uint256,uint256)"](
+                user2.address,
+                boost_amount,
+                end_time
+            )
+
+            const old_end_time = end_time
+
+            await advanceTime(duration.add(WEEK.mul(5)).toNumber())
+
+            const current_ts = await provider.getBlock('latest').then(b => b.timestamp)
+            end_time = BigNumber.from(current_ts).add(duration).div(WEEK).mul(WEEK)
+
+            const prev_adjusted_balance1 = await boost.adjusted_balance_of(user1.address)
+            const prev_adjusted_balance2 = await boost.adjusted_balance_of(user2.address)
+
+            const prev_delegated_balance = await boost.delegated_balance(user1.address)
+            const prev_delegeable_balance = await boost.delegable_balance(user1.address)
+            const prev_received_balance = await boost.received_balance(user2.address)
+
+            const prev_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const prev_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
+
+            const prev_user1_delegated_nonce = await boost.delegatedCheckpointsNonces(user1.address)
+            const prev_user2_received_nonce = await boost.receivedCheckpointsNonces(user2.address)
+
+            const prev_user2_delegated_nonce = await boost.delegatedCheckpointsNonces(user2.address)
+            const prev_user1_received_nonce = await boost.receivedCheckpointsNonces(user1.address)
+
+            const prev_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
+
+            const boost_tx = await boost.connect(user1)["boost(address,uint256,uint256)"](
+                user2.address,
+                boost_amount,
+                end_time
+            )
+            
+            const tx_block = (await boost_tx).blockNumber
+            const tx_ts = (await ethers.provider.getBlock(tx_block || 0)).timestamp
+
+            const user1_point = await boost.delegated_point(user1.address)
+            const user2_point = await boost.received_point(user2.address)
+
+            const new_user1_slope_changes = await boost.delegatedSlopeChanges(user1.address, end_time)
+            const new_user2_slope_changes = await boost.receivedSlopeChanges(user2.address, end_time)
+
+            const new_adjusted_balance1 = await boost.adjusted_balance_of(user1.address, { blockTag: tx_block })
+            const new_adjusted_balance2 = await boost.adjusted_balance_of(user2.address, { blockTag: tx_block })
+
+            const new_delegated_balance = await boost.delegated_balance(user1.address, { blockTag: tx_block })
+            const new_delegeable_balance = await boost.delegable_balance(user1.address, { blockTag: tx_block })
+            const new_received_balance = await boost.received_balance(user2.address, { blockTag: tx_block })
+
+            const expected_slope = boost_amount.div(end_time.sub(tx_ts))
+            const expected_bias = expected_slope.mul(end_time.sub(tx_ts))
+
+            expect(user1_point.slope).to.be.equal(expected_slope)
+            expect(user1_point.bias).to.be.equal(expected_bias)
+            expect(user1_point.ts).to.be.equal(tx_ts)
+
+            expect(user2_point.slope).to.be.equal(expected_slope)
+            expect(user2_point.bias).to.be.equal(expected_bias)
+            expect(user2_point.ts).to.be.equal(tx_ts)
+
+            expect(new_user1_slope_changes).to.be.equal(prev_user1_slope_changes.add(expected_slope))
+            expect(new_user2_slope_changes).to.be.equal(prev_user2_slope_changes.add(expected_slope))
+
+            expect(new_adjusted_balance1).to.be.equal(prev_adjusted_balance1.sub(expected_bias))
+            expect(new_adjusted_balance2).to.be.equal(prev_adjusted_balance2.add(expected_bias))
+
+            expect(new_delegated_balance).to.be.equal(prev_delegated_balance.add(expected_bias))
+            expect(new_delegeable_balance).to.be.equal(prev_delegeable_balance.sub(expected_bias))
+            expect(new_received_balance).to.be.equal(prev_received_balance.add(expected_bias))
+
+            expect(await boost.delegatedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
+
+            expect(await boost.delegatedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
+
+            expect(await boost.delegatedCheckpointsDates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts)
+
+            expect(await boost.receivedCheckpointsDates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts)
+
+            const new_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
+
+            expect(new_user2_receiver_slope_changes.length).to.be.equal(prev_user2_receiver_slope_changes.length)
+
+            const new_receiver_slope_change = new_user2_receiver_slope_changes[new_user2_receiver_slope_changes.length - 1]
+
+            expect(new_receiver_slope_change.slopeChange).to.be.equal(expected_slope)
+            expect(new_receiver_slope_change.endTimestamp).to.be.equal(end_time)
+
+            for(let i = 0; i < new_user2_receiver_slope_changes.length; i++) {
+                expect(new_user2_receiver_slope_changes[i].endTimestamp).not.to.be.equal(old_end_time)
+            }
+
+            expect(boost_tx).to.emit(boost, "Transfer").withArgs(
+                user1.address,
+                user2.address,
+                boost_amount
+            );
+
+            expect(boost_tx).to.emit(boost, "Boost").withArgs(
+                user1.address,
+                user2.address,
+                expected_bias,
+                expected_slope,
+                tx_ts
+            );
+        });
+
     });
 
     describe('checkpoint_user', async () => {
@@ -553,8 +691,8 @@ describe('BoostV2 contract tests', () => {
 
             const old_user_point = await boost.delegated_point(user1.address)
 
-            const prev_user_delegated_nonce = await boost.delegated_checkpoints_nonces(user1.address)
-            const prev_user_received_nonce = await boost.received_checkpoints_nonces(user1.address)
+            const prev_user_delegated_nonce = await boost.delegatedCheckpointsNonces(user1.address)
+            const prev_user_received_nonce = await boost.receivedCheckpointsNonces(user1.address)
 
             const checkpoint_tx = await boost.connect(admin).checkpoint_user(user1.address)
             
@@ -576,7 +714,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -587,11 +725,11 @@ describe('BoostV2 contract tests', () => {
             expect(new_user_point.bias).to.be.equal(new_bias)
             expect(new_user_point.ts).to.be.equal(tx_ts)
 
-            expect(await boost.delegated_checkpoints_nonces(user1.address)).to.be.equal(prev_user_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user1.address)).to.be.equal(prev_user_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user1.address)).to.be.equal(prev_user_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user1.address)).to.be.equal(prev_user_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_dates(user1.address, prev_user_delegated_nonce)).to.be.equal(tx_ts)
-            expect(await boost.received_checkpoints_dates(user1.address, prev_user_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user1.address, prev_user_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user1.address, prev_user_received_nonce)).to.be.equal(tx_ts)
 
 
         });
@@ -602,8 +740,8 @@ describe('BoostV2 contract tests', () => {
 
             const old_user_point = await boost.received_point(user2.address)
 
-            const prev_user_delegated_nonce = await boost.delegated_checkpoints_nonces(user2.address)
-            const prev_user_received_nonce = await boost.received_checkpoints_nonces(user2.address)
+            const prev_user_delegated_nonce = await boost.delegatedCheckpointsNonces(user2.address)
+            const prev_user_received_nonce = await boost.receivedCheckpointsNonces(user2.address)
 
             const checkpoint_tx = await boost.connect(admin).checkpoint_user(user2.address)
             
@@ -625,7 +763,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.received_slope_changes(user2.address, ts)
+                    await boost.receivedSlopeChanges(user2.address, ts)
                 )
                 
             }
@@ -636,23 +774,23 @@ describe('BoostV2 contract tests', () => {
             expect(new_user_point.bias).to.be.equal(new_bias)
             expect(new_user_point.ts).to.be.equal(tx_ts)
 
-            expect(await boost.delegated_checkpoints_nonces(user2.address)).to.be.equal(prev_user_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user2.address)).to.be.equal(prev_user_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user2.address)).to.be.equal(prev_user_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user2.address)).to.be.equal(prev_user_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_dates(user2.address, prev_user_delegated_nonce)).to.be.equal(tx_ts)
-            expect(await boost.received_checkpoints_dates(user2.address, prev_user_received_nonce)).to.be.equal(tx_ts)
+            expect(await boost.delegatedCheckpointsDates(user2.address, prev_user_delegated_nonce)).to.be.equal(tx_ts)
+            expect(await boost.receivedCheckpointsDates(user2.address, prev_user_received_nonce)).to.be.equal(tx_ts)
 
         });
 
-        it(' should put everything back to 0 after the delegation duration', async () => {
+        it(' should put everything back to 0 after the delegation duration & clear slope changes', async () => {
 
             await advanceTime(duration.add(WEEK).toNumber())
 
-            const prev_user1_delegated_nonce = await boost.delegated_checkpoints_nonces(user1.address)
-            const prev_user1_received_nonce = await boost.received_checkpoints_nonces(user1.address)
+            const prev_user1_delegated_nonce = await boost.delegatedCheckpointsNonces(user1.address)
+            const prev_user1_received_nonce = await boost.receivedCheckpointsNonces(user1.address)
 
-            const prev_user2_delegated_nonce = await boost.delegated_checkpoints_nonces(user2.address)
-            const prev_user2_received_nonce = await boost.received_checkpoints_nonces(user2.address)
+            const prev_user2_delegated_nonce = await boost.delegatedCheckpointsNonces(user2.address)
+            const prev_user2_received_nonce = await boost.receivedCheckpointsNonces(user2.address)
 
             const tx_1 = await boost.connect(admin).checkpoint_user(user1.address)
 
@@ -673,17 +811,87 @@ describe('BoostV2 contract tests', () => {
             const tx_ts1 = (await ethers.provider.getBlock(tx_block1 || 0)).timestamp
             const tx_ts2 = (await ethers.provider.getBlock(tx_block2 || 0)).timestamp
 
-            expect(await boost.delegated_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_nonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
-            expect(await boost.received_checkpoints_nonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
+            expect(await boost.delegatedCheckpointsNonces(user2.address)).to.be.equal(prev_user2_delegated_nonce.add(1))
+            expect(await boost.receivedCheckpointsNonces(user1.address)).to.be.equal(prev_user1_received_nonce.add(1))
 
-            expect(await boost.delegated_checkpoints_dates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts1)
-            expect(await boost.received_checkpoints_dates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts1)
+            expect(await boost.delegatedCheckpointsDates(user1.address, prev_user1_delegated_nonce)).to.be.equal(tx_ts1)
+            expect(await boost.receivedCheckpointsDates(user1.address, prev_user1_received_nonce)).to.be.equal(tx_ts1)
 
-            expect(await boost.received_checkpoints_dates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts2)
-            expect(await boost.delegated_checkpoints_dates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts2)
+            expect(await boost.receivedCheckpointsDates(user2.address, prev_user2_received_nonce)).to.be.equal(tx_ts2)
+            expect(await boost.delegatedCheckpointsDates(user2.address, prev_user2_delegated_nonce)).to.be.equal(tx_ts2)
+
+            const new_user2_receiver_slope_changes = await boost.getUserSlopeChanges(user2.address)
+
+            expect(new_user2_receiver_slope_changes.length).to.be.equal(0)
+
+        });
+
+        it(' should clear all expired receiver slope changes', async () => {
+
+            await advanceTime(duration.add(WEEK).toNumber())
+
+            await setUpLocks()
+
+            const current_ts = await provider.getBlock('latest').then(b => b.timestamp)
+            end_time = BigNumber.from(current_ts).add(duration).div(WEEK).mul(WEEK)
+
+            const boost_amount_2 = ethers.utils.parseEther('550')
+            const end_time_2 = end_time.add(WEEK.mul(5))
+
+            const boost_tx = await boost.connect(user1)["boost(address,uint256,uint256)"](
+                user3.address,
+                boost_amount,
+                end_time
+            )
+
+            const boost_tx_2 = await boost.connect(user2)["boost(address,uint256,uint256)"](
+                user3.address,
+                boost_amount_2,
+                end_time_2
+            )
+            
+            const tx_block = (await boost_tx).blockNumber
+            const tx_ts_1 = (await ethers.provider.getBlock(tx_block || 0)).timestamp
+            
+            const tx_block_2 = (await boost_tx_2).blockNumber
+            const tx_ts_2 = (await ethers.provider.getBlock(tx_block_2 || 0)).timestamp
+
+            const expected_slope = boost_amount.div(end_time.sub(tx_ts_1))
+
+            const expected_slope_2 = boost_amount_2.div(end_time_2.sub(tx_ts_2))
+
+            const prev_receiver_slope_changes = await boost.getUserSlopeChanges(user3.address)
+
+            expect(prev_receiver_slope_changes[0].slopeChange).to.be.equal(expected_slope)
+            expect(prev_receiver_slope_changes[0].endTimestamp).to.be.equal(end_time)
+            expect(prev_receiver_slope_changes[1].slopeChange).to.be.equal(expected_slope_2)
+            expect(prev_receiver_slope_changes[1].endTimestamp).to.be.equal(end_time_2)
+
+            await advanceTime(duration.add(WEEK).toNumber())
+
+            await boost.connect(admin).checkpoint_user(user3.address)
+
+            const prev_receiver_slope_changes_2 = await boost.getUserSlopeChanges(user3.address)
+
+            expect(prev_receiver_slope_changes_2.length).to.be.equal(prev_receiver_slope_changes.length - 1)
+
+            expect(prev_receiver_slope_changes[0].slopeChange).to.be.equal(expected_slope)
+            expect(prev_receiver_slope_changes[0].endTimestamp).to.be.equal(end_time)
+            expect(prev_receiver_slope_changes[0].slopeChange).not.to.be.equal(expected_slope_2)
+            expect(prev_receiver_slope_changes[0].endTimestamp).not.to.be.equal(end_time_2)
+
+            await advanceTime(duration.add(WEEK.mul(7)).toNumber())
+
+            await boost.connect(admin).checkpoint_user(user3.address)
+
+            const new_receiver_slope_changes = await boost.getUserSlopeChanges(user3.address)
+
+            expect(new_receiver_slope_changes.length).to.be.equal(0)
+
+            expect(new_receiver_slope_changes).to.be.eql([])
 
         });
 
@@ -737,7 +945,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -811,7 +1019,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -835,7 +1043,7 @@ describe('BoostV2 contract tests', () => {
             advanceTime(WEEK.mul(2).toNumber())
 
             const old_user1_point = await boost.delegated(user1.address, 
-                (await boost.delegated_checkpoints_nonces(user1.address)).sub(2)
+                (await boost.delegatedCheckpointsNonces(user1.address)).sub(2)
             )
             const user1_balance = await holyPalPower.balanceOfAt(user1.address, target_ts)
             const user2_balance = await holyPalPower.balanceOfAt(user2.address, target_ts)
@@ -855,7 +1063,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -948,7 +1156,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -969,7 +1177,7 @@ describe('BoostV2 contract tests', () => {
             advanceTime(WEEK.mul(2).toNumber())
 
             const old_user1_point = await boost.delegated(user1.address, 
-                (await boost.delegated_checkpoints_nonces(user1.address)).sub(2)
+                (await boost.delegatedCheckpointsNonces(user1.address)).sub(2)
             )
             const user1_balance = await holyPalPower.balanceOfAt(user1.address, snapshot_ts)
             const user2_balance = await holyPalPower.balanceOfAt(user2.address, snapshot_ts)
@@ -989,7 +1197,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -1048,7 +1256,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.delegated_slope_changes(user1.address, ts)
+                    await boost.delegatedSlopeChanges(user1.address, ts)
                 )
                 
             }
@@ -1087,7 +1295,7 @@ describe('BoostV2 contract tests', () => {
 
                 last_update_ts = ts
                 new_slope = new_slope.sub(
-                    await boost.received_slope_changes(user2.address, ts)
+                    await boost.receivedSlopeChanges(user2.address, ts)
                 )
                 
             }

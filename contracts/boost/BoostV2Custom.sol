@@ -22,6 +22,8 @@ interface HolyPalPower {
     function totalSupply() external view returns(uint256);
     // solhint-disable-next-line
     function locked__end(address user) external view returns(uint256);
+    function totalLocked() external view returns(uint256);
+    function totalLockedAt(uint256 blockNumber) external view returns(uint256);
 }
 
 
@@ -29,11 +31,11 @@ contract BoostV2Custom {
 
     // Constants
 
-    string constant private NAME = "HolyPal Power Boost";
-    string constant private SYMBOL = "hPalBoost";
+    string constant private NAME = "HolyPal Power Boost 2";
+    string constant private SYMBOL = "hPalBoost2";
     string constant private VERSION = "v2.1.0";
 
-    bytes32 constant private EIP712_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)");
+    bytes32 constant private EIP712_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 constant private PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     uint256 constant private WEEK = 86400 * 7;
@@ -116,8 +118,7 @@ contract BoostV2Custom {
             keccak256(bytes(NAME)),
             keccak256(bytes(VERSION)),
             block.chainid,
-            address(this),
-            blockhash(block.number - 1)
+            address(this)
         ));
         HOLY_PAL_POWER = _ve;
 
@@ -140,33 +141,43 @@ contract BoostV2Custom {
     }
 
     function totalSupply() external view returns(uint256) {
-        return HolyPalPower(HOLY_PAL_POWER).totalSupply();
+        return HolyPalPower(HOLY_PAL_POWER).totalLocked();
+    }
+
+    // solhint-disable-next-line
+    function total_locked() external view returns(uint256) {
+        return HolyPalPower(HOLY_PAL_POWER).totalLocked();
+    }
+    
+    // solhint-disable-next-line
+    function total_locked_at(uint256 blockNumber) external view returns(uint256) {
+        return HolyPalPower(HOLY_PAL_POWER).totalLockedAt(blockNumber);
     }
 
     function balanceOf(address _user) external view returns(uint256) {
-        return _balance_of(_user);
+        return _balanceOf(_user);
     }
 
     // solhint-disable-next-line
     function adjusted_balance_of(address _user) external view returns(uint256) {
-        return _balance_of(_user);
+        return _balanceOf(_user);
     }
 
     function balanceOfAt(address _user, uint256 _ts) external view returns(uint256) {
-        return _balance_of_at(_user, _ts);
+        return _balanceOfAt(_user, _ts);
     }
 
     // solhint-disable-next-line
     function adjusted_balance_of_at(address _user, uint256 _ts) external view returns(uint256) {
-        return _balance_of_at(_user, _ts);
+        return _balanceOfAt(_user, _ts);
     }
 
     // solhint-disable-next-line
     function voting_adjusted_balance_of_at(address _user, uint256 _snapshot_ts, uint256 _target_ts) external view returns(uint256) {
         uint256 amount = HolyPalPower(HOLY_PAL_POWER).balanceOfAt(_user, _snapshot_ts);
 
-        Point memory delegatedPoint = _checkpoint_read(_user, true, _snapshot_ts);
-        Point memory receivedPoint = _checkpoint_read(_user, false, _snapshot_ts);
+        Point memory delegatedPoint = _checkpointRead(_user, true, _snapshot_ts);
+        Point memory receivedPoint = _checkpointRead(_user, false, _snapshot_ts);
         
         uint256 ts= (_snapshot_ts / WEEK) * WEEK;
         for(uint256 i; i < 255;) {
@@ -201,20 +212,34 @@ contract BoostV2Custom {
 
     // solhint-disable-next-line
     function delegated_balance(address _user) external view returns(uint256) {
-        Point memory point = _checkpoint_read(_user, true, 0);
+        Point memory point = _checkpointRead(_user, true, 0);
         return point.bias - point.slope * (block.timestamp - point.ts);
     }
 
     // solhint-disable-next-line
     function received_balance(address _user) external view returns(uint256) {
-        Point memory point = _checkpoint_read(_user, false, 0);
+        Point memory point = _checkpointRead(_user, false, 0);
         return point.bias - point.slope * (block.timestamp - point.ts);
     }
 
     // solhint-disable-next-line
     function delegable_balance(address _user) external view returns(uint256) {
-        Point memory point = _checkpoint_read(_user, true, 0);
+        Point memory point = _checkpointRead(_user, true, 0);
         return HolyPalPower(HOLY_PAL_POWER).balanceOf(_user) - (point.bias - point.slope * (block.timestamp - point.ts));
+    }
+
+    // solhint-disable-next-line
+    function delegated_point(address _user) external view returns(Point memory) {
+        uint256 user_nonce = delegatedCheckpointsNonces[_user];
+        if(user_nonce == 0) return Point(0, 0, 0);
+        return delegated[_user][user_nonce - 1];
+    }
+
+    // solhint-disable-next-line
+    function received_point(address _user) external view returns(Point memory) {
+        uint256 user_nonce = receivedCheckpointsNonces[_user];
+        if(user_nonce == 0) return Point(0, 0, 0);
+        return received[_user][user_nonce - 1];
     }
 
     function getUserSlopeChanges(address _user) external view returns(SlopeChange[] memory) {
@@ -245,12 +270,14 @@ contract BoostV2Custom {
     function checkpoint_user(address _user) external {
         uint256 delegatedNonce = delegatedCheckpointsNonces[_user];
         uint256 receivedNonce = receivedCheckpointsNonces[_user];
+        delegated[_user].push(_checkpointWrite(_user, true));
+        received[_user].push(_checkpointWrite(_user, false));
+        delegatedCheckpointsDates[_user][delegatedNonce] = block.timestamp;
+        receivedCheckpointsDates[_user][receivedNonce] = block.timestamp;
         delegatedCheckpointsNonces[_user] = receivedNonce + 1;
         receivedCheckpointsNonces[_user] = receivedNonce + 1;
-        delegated[_user][delegatedNonce] = _checkpoint_write(_user, true);
-        received[_user][receivedNonce] = _checkpoint_write(_user, false);
 
-        _update_received_slope_changes(_user);
+        _updateReceivedSlopeChanges(_user);
     }
 
     function approve(address _spender, uint256 _value) external returns(bool) {
@@ -273,31 +300,11 @@ contract BoostV2Custom {
         if(block.timestamp > _deadline) revert DeadlineReached();
 
         uint256 nonce = nonces[_owner];
-        unchecked {
-            address recoveredAddress = ecrecover(
-                keccak256(
-                    abi.encodePacked(
-                        "\x19\x01",
-                        DOMAIN_SEPARATOR,
-                        keccak256(
-                            abi.encode(
-                                PERMIT_TYPEHASH,
-                                _owner,
-                                _spender,
-                                _value,
-                                nonce,
-                                _deadline
-                            )
-                        )
-                    )
-                ),
-                _v,
-                _r,
-                _s
-            );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, _owner, _spender, _value, nonce, _deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        address signer = ecrecover(digest, _v, _r, _s);
 
-            if(recoveredAddress == address(0) || recoveredAddress != _owner) revert InvalidSigner();
-        }
+        if(signer == address(0) || signer != _owner) revert InvalidSigner();
 
         allowance[_owner][_spender] = _value;
         nonces[_owner] = nonce + 1;
@@ -325,8 +332,7 @@ contract BoostV2Custom {
 
     // Internal functions
 
-    // solhint-disable-next-line
-    function _find_delegated_point(address _user, uint256 _ts) internal view returns(Point memory) {
+    function _findDelegatedPoint(address _user, uint256 _ts) internal view returns(Point memory) {
         if(_ts == 0) _ts = block.timestamp;
         Point memory empty_point = Point(0, 0, 0);
 
@@ -334,7 +340,7 @@ contract BoostV2Custom {
 
         if(user_nonce == 0) return empty_point;
 
-        if(delegatedCheckpointsDates[_user][0] <= _ts) return empty_point;
+        if(delegatedCheckpointsDates[_user][0] > _ts) return empty_point;
 
         if(delegatedCheckpointsDates[_user][user_nonce - 1] <= _ts) return delegated[_user][user_nonce - 1];
 
@@ -359,8 +365,7 @@ contract BoostV2Custom {
         return delegated[_user][high - 1];
     }
 
-    // solhint-disable-next-line
-    function _find_received_point(address _user, uint256 _ts) internal view returns(Point memory) {
+    function _findReceivedPoint(address _user, uint256 _ts) internal view returns(Point memory) {
         if(_ts == 0) _ts = block.timestamp;
         Point memory empty_point = Point(0, 0, 0);
 
@@ -368,7 +373,7 @@ contract BoostV2Custom {
 
         if(user_nonce == 0) return empty_point;
 
-        if(receivedCheckpointsDates[_user][0] <= _ts) return empty_point;
+        if(receivedCheckpointsDates[_user][0] > _ts) return empty_point;
 
         if(receivedCheckpointsDates[_user][user_nonce - 1] <= _ts) return received[_user][user_nonce - 1];
 
@@ -393,15 +398,14 @@ contract BoostV2Custom {
         return received[_user][high - 1];
     }
 
-    // solhint-disable-next-line
-    function _checkpoint_read(address _user, bool _delegated, uint256 _target_ts) internal view returns(Point memory) {
+    function _checkpointRead(address _user, bool _delegated, uint256 _target_ts) internal view returns(Point memory) {
         if(_target_ts == 0) _target_ts = block.timestamp;
         Point memory point = Point(0, 0, 0);
 
         if(_delegated) {
-            point = _find_delegated_point(_user, _target_ts);
+            point = _findDelegatedPoint(_user, _target_ts);
         } else {
-            point = _find_received_point(_user, _target_ts);
+            point = _findReceivedPoint(_user, _target_ts);
         }
 
         if(point.ts == 0) point.ts = _target_ts;
@@ -435,14 +439,13 @@ contract BoostV2Custom {
         return point;
     }
 
-    // solhint-disable-next-line
-    function _checkpoint_write(address _user, bool _delegated) internal returns(Point memory) {
+    function _checkpointWrite(address _user, bool _delegated) internal returns(Point memory) {
         Point memory point = Point(0, 0, 0);
 
         if(_delegated) {
-            point = _find_delegated_point(_user, block.timestamp);
+            point = _findDelegatedPoint(_user, block.timestamp);
         } else {
-            point = _find_received_point(_user, block.timestamp);
+            point = _findReceivedPoint(_user, block.timestamp);
         }
 
         if(point.ts == 0) point.ts = block.timestamp;
@@ -484,8 +487,7 @@ contract BoostV2Custom {
         return point;
     }
 
-    // solhint-disable-next-line
-    function _update_received_slope_changes(address _user) internal {
+    function _updateReceivedSlopeChanges(address _user) internal {
         SlopeChange[] memory userChanges = receiverSlopeChanges[_user];
         uint256 length = userChanges.length;
         if(length == 0) return;
@@ -493,7 +495,11 @@ contract BoostV2Custom {
 
         uint256 expiredCount;
         for(uint256 i; i < length;) {
-            if(userChanges[i].endTimestamp <= block.timestamp) expiredCount;
+            if(userChanges[i].endTimestamp <= block.timestamp) {
+                expiredCount++;
+            } else if(userChanges[i].endTimestamp > block.timestamp) {
+                break;
+            }
             unchecked { ++i; }
         }
 
@@ -507,31 +513,28 @@ contract BoostV2Custom {
         }
     }
 
-    // solhint-disable-next-line
-    function _balance_of(address _user) internal view returns(uint256) {
+    function _balanceOf(address _user) internal view returns(uint256) {
         uint256 amount = HolyPalPower(HOLY_PAL_POWER).balanceOf(_user);
 
-        Point memory point = _checkpoint_read(_user, true, 0);
+        Point memory point = _checkpointRead(_user, true, 0);
         amount -= (point.bias - point.slope * (block.timestamp - point.ts));
 
-        point = _checkpoint_read(_user, false, 0);
+        point = _checkpointRead(_user, false, 0);
         amount += (point.bias - point.slope * (block.timestamp - point.ts));
         return amount;
     }
 
-    // solhint-disable-next-line
-    function _balance_of_at(address _user, uint256 _target_ts) internal view returns(uint256) {
+    function _balanceOfAt(address _user, uint256 _target_ts) internal view returns(uint256) {
         uint256 amount = HolyPalPower(HOLY_PAL_POWER).balanceOfAt(_user, _target_ts);
 
-        Point memory point = _checkpoint_read(_user, true, _target_ts);
+        Point memory point = _checkpointRead(_user, true, _target_ts);
         amount -= (point.bias - point.slope * (_target_ts - point.ts));
 
-        point = _checkpoint_read(_user, false, _target_ts);
+        point = _checkpointRead(_user, false, _target_ts);
         amount += (point.bias - point.slope * (_target_ts - point.ts));
         return amount;
     }
 
-    // solhint-disable-next-line
     function _boost(address _from, address _to, uint256 _amount, uint256 _endtime) internal {
         if(_to == address(0) || _to == _from) revert InvalidAddress();
         if(_amount == 0) revert NullAmount();
@@ -540,7 +543,7 @@ contract BoostV2Custom {
         if(_endtime > HolyPalPower(HOLY_PAL_POWER).locked__end(_from)) revert EndAfterLockEnd();
 
         // checkpoint delegated point
-        Point memory point = _checkpoint_write(_from, true);
+        Point memory point = _checkpointWrite(_from, true);
         if(
             _amount > HolyPalPower(HOLY_PAL_POWER).balanceOf(_from) - (point.bias - point.slope * (block.timestamp - point.ts))
         ) revert InsufficientBalance();
@@ -558,42 +561,41 @@ contract BoostV2Custom {
 
         // store updated values
         delegatedNonce = delegatedCheckpointsNonces[_from];
-        delegatedCheckpointsNonces[_from] = delegatedNonce + 1;
-        delegated[_from][delegatedNonce] = point;
+        delegated[_from].push(point);
         delegatedSlopeChanges[_from][_endtime] += slope;
-        delegatedCheckpointsDates[_from][receivedNonce] = block.timestamp;
+        delegatedCheckpointsDates[_from][delegatedNonce] = block.timestamp;
+        delegatedCheckpointsNonces[_from] = delegatedNonce + 1;
 
         // update received amount
-        point = _checkpoint_write(_to, false);
+        point = _checkpointWrite(_to, false);
         point.bias += bias;
         point.slope += slope;
 
         // store updated values
         receivedNonce = receivedCheckpointsNonces[_to];
-        receivedCheckpointsNonces[_to] = receivedNonce + 1;
-        received[_to][receivedNonce] = point;
+        received[_to].push(point);
         receivedSlopeChanges[_to][_endtime] += slope;
         receivedCheckpointsDates[_to][receivedNonce] = block.timestamp;
+        receivedCheckpointsNonces[_to] = receivedNonce + 1;
 
         // also checkpoint received and delegated
         delegatedNonce = delegatedCheckpointsNonces[_to];
-        delegatedCheckpointsNonces[_to] = delegatedNonce + 1;
         receivedNonce = receivedCheckpointsNonces[_from];
-        receivedCheckpointsNonces[_from] = receivedNonce + 1;
-        received[_from][receivedNonce] = _checkpoint_write(_from, false);
-        delegated[_to][delegatedNonce] = _checkpoint_write(_to, true);
+        received[_from].push(_checkpointWrite(_from, false));
+        delegated[_to].push(_checkpointWrite(_to, true));
         receivedCheckpointsDates[_from][receivedNonce] = block.timestamp;
-        delegatedCheckpointsDates[_to][receivedNonce] = block.timestamp;
+        delegatedCheckpointsDates[_to][delegatedNonce] = block.timestamp;
+        delegatedCheckpointsNonces[_to] = delegatedNonce + 1;
+        receivedCheckpointsNonces[_from] = receivedNonce + 1;
 
         // update slope changes
-        _update_received_slope_changes(_from);
-        _update_received_slope_changes(_to);
+        _updateReceivedSlopeChanges(_from);
+        _updateReceivedSlopeChanges(_to);
         receiverSlopeChanges[_to].push(SlopeChange(slope, _endtime));
 
         emit Transfer(_from, _to, _amount);
         emit Boost(_from, _to, bias, slope, block.timestamp);
     }
-
 
     // Maths
 
