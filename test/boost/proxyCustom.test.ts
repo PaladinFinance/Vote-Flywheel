@@ -63,7 +63,7 @@ describe('DelegationProxyCustom contract tests', () => {
 
     });
 
-    it(' should be deployed & have correct parameters & mint the correct initial supply', async () => {
+    it(' should be deployed & have correct parameters', async () => {
         expect(proxy.address).to.properAddress
 
         expect(await proxy.delegation()).to.be.eq(boost.address)

@@ -64,7 +64,7 @@ describe('BoostV2Custom contract tests', () => {
 
     });
 
-    it(' should be deployed & have correct parameters & mint the correct initial supply', async () => {
+    it(' should be deployed & have correct parameters', async () => {
         expect(boost.address).to.properAddress
 
         expect(await boost.HOLY_PAL_POWER()).to.be.equal(holyPalPower.address)

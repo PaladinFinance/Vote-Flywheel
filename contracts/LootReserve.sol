@@ -36,6 +36,7 @@ contract LootReserve is Owner {
 
     event Init(address loot);
     event MaxAllowanceSet(address indexed token, address indexed spender);
+    event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
 
 
     // Constructor & Init
@@ -85,6 +86,14 @@ contract LootReserve is Owner {
         emit MaxAllowanceSet(address(extraToken), loot);
     }
 
-    // Add method to block all and remove all tokens
+    function emptyReserve() external onlyOwner {
+        uint256 palBalance = pal.balanceOf(address(this));
+        uint256 extraBalance = extraToken.balanceOf(address(this));
+
+        pal.safeTransfer(owner(), palBalance);
+        extraToken.safeTransfer(owner(), extraBalance);
+
+        emit CancelReserve(palBalance, extraBalance);
+    }
 
 }

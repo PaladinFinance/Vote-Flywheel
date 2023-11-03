@@ -28,6 +28,11 @@ contract HolyPalPower is IHolyPalPower {
 
     /** @notice Seconds in a Week */
     uint256 private constant WEEK = 604800;
+    
+    uint256 private constant ANCHOR_BLOCK = 14709709;
+    uint256 private constant ANCHOR_TIMESTAMP = 1651650836;
+
+    uint256 private constant SCALE_UNIT = 1000000000;
 
 
     // Storage
@@ -47,12 +52,14 @@ contract HolyPalPower is IHolyPalPower {
     function balanceOf(address user) external view returns(uint256) {
         IHolyPaladinToken.UserLock memory currentLock = IHolyPaladinToken(hPal).getUserLock(user);
         if(currentLock.amount == 0) return 0;
+        
+        uint256 endTimestamp = ((currentLock.startTimestamp + currentLock.duration) / WEEK) * WEEK;
+        if(endTimestamp <= block.timestamp) return 0;
+        
+        uint256 duration = endTimestamp - currentLock.startTimestamp;
+        uint256 slope = currentLock.amount / duration;
 
-        uint256 slope = currentLock.amount / currentLock.duration;
-        uint256 bias = slope * currentLock.duration;
-        uint256 endTimestamp = currentLock.startTimestamp + currentLock.duration;
-
-        return bias - (slope * (endTimestamp - block.timestamp));
+        return (slope * (endTimestamp - block.timestamp));
     }
 
     function balanceOfAt(address user, uint256 timestamp) external view returns(uint256) {
@@ -60,7 +67,7 @@ contract HolyPalPower is IHolyPalPower {
 
         if(point.endTimestamp <= timestamp) return 0;
 
-        return uint128(point.bias) - (uint128(point.slope) * (point.endTimestamp - timestamp));
+        return (uint128(point.slope) * (point.endTimestamp - timestamp));
     }
 
     function getUserPoint(address user) external view returns(Point memory) {
@@ -98,14 +105,17 @@ contract HolyPalPower is IHolyPalPower {
 
         // Empty Lock (no Lock for user, or not old enough)
         if(lock.amount == 0) return point;
+        
+        // Get the end timetamp
+        // (we round down endTimestamp to weeks for voting purposes)
+        point.endTimestamp = ((lock.startTimestamp + lock.duration) / WEEK) * WEEK;
+        uint256 duration = point.endTimestamp - lock.startTimestamp;
 
         // Calculate the slope & bias
-        point.slope = convertUint128ToInt128(lock.amount / lock.duration);
-        point.bias = point.slope * convertUint128ToInt128(uint128(lock.duration));
+        point.slope = convertUint128ToInt128(lock.amount / uint128(duration));
+        point.bias = point.slope * convertUint128ToInt128(uint128(duration));
 
         // Fill the rest of the Point
-        // (we round down endTimestamp to weeks for voting purposes)
-        point.endTimestamp = (lock.startTimestamp + lock.duration / WEEK) * WEEK;
         point.blockNumber = lock.fromBlock;
 
         return point;
@@ -118,13 +128,16 @@ contract HolyPalPower is IHolyPalPower {
         uint256 locksCount = _hPal.getUserLockCount(user);
         if(locksCount == 0) return emptyLock;
 
+
         // Check curent active Lock is old enough
         IHolyPaladinToken.UserLock memory lock = _hPal.getUserLock(user);
-        if(lock.startTimestamp <= timestamp) return lock;
+        if(timestamp >= block.timestamp) return lock;
+        uint256 targetBlockNumber = _findBlockNumberForTimestamp(timestamp);
+        if(lock.fromBlock <= targetBlockNumber) return lock;
 
         // Check there is a Lock old enough
         lock = _hPal.userLocks(user, 0);
-        if(lock.startTimestamp <= timestamp) return emptyLock;
+        if(lock.fromBlock > targetBlockNumber) return emptyLock;
 
         // Otherwise look in user Locks to find the correct one
         uint256 high = locksCount - 1; // last Lock already checked
@@ -134,10 +147,10 @@ contract HolyPalPower is IHolyPalPower {
         while (low < high) {
             mid = Math.average(low, high);
             IHolyPaladinToken.UserLock memory midLock = _hPal.userLocks(user, mid);
-            if (midLock.startTimestamp == timestamp) {
+            if (midLock.fromBlock == targetBlockNumber) {
                 return midLock;
             }
-            if (midLock.startTimestamp > timestamp) {
+            if (midLock.fromBlock > targetBlockNumber || midLock.startTimestamp > timestamp) {
                 high = mid;
             } else {
                 low = mid + 1;
@@ -145,6 +158,15 @@ contract HolyPalPower is IHolyPalPower {
         }
 
         return high == 0 ? emptyLock : _hPal.userLocks(user, high - 1);
+    }
+
+    function _findBlockNumberForTimestamp(uint256 timestamp) internal view returns(uint256) {
+        uint256 deltaBlocks = block.number - ANCHOR_BLOCK;
+        uint256 deltaTs = block.timestamp - ANCHOR_TIMESTAMP;
+
+        uint256 secPerBlock = (deltaTs * SCALE_UNIT) / deltaBlocks;
+
+        return block.number - (((block.timestamp - timestamp) * SCALE_UNIT) / secPerBlock);
     }
 
     // Maths

@@ -1,38 +1,24 @@
 import random
+from decimal import *
 
-MAX_CHECKPOINTS = 1000000000
+getcontext().prec = 18
+getcontext().rounding = ROUND_FLOOR
 
-LOOPS = 255
+duration = Decimal(random.randint(7890000, 63072000))
+amount = Decimal(random.randint(0, 750000))
+start = Decimal(1698695207)
 
-TRIES = 10000
+WEEK = Decimal(604800)
 
-i = MAX_CHECKPOINTS
+end = ((start + duration) / WEEK) * WEEK
 
-while i > 0:
-    for j in range(TRIES):
-        target_checkpoint = random.randint(0, i)
+duration = end - start
 
-        high = i - 1
-        low = 0
-        mid = 0
+slope = amount / duration
+bias = slope * duration
 
-        count = 0
-
-        while low <= high:
-            count += 1
-
-            mid = (high & low) + ((high ^ low) >> 1)
-
-            if mid == target_checkpoint:
-                break
-
-            if mid < target_checkpoint:
-                low = mid + 1
-            else:
-                high = mid
-
-        print("Max checkpoints : " + str(i) + " - target checkpoint : " + str(target_checkpoint) + " => found checkpoint in " + str(count) + " tries")
-    print()
-    i = i - int(i * 0.05)
-
-        
+for i in range(0, int(duration), int(WEEK)):
+    ts = start + Decimal(i)
+    balance_1 = slope * (end - ts)
+    balance_2 = bias - (slope * (ts - start))
+    print(i, " - ", ts, " - ", balance_1, " - ", balance_2, " - ", balance_1 == balance_2)

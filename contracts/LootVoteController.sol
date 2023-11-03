@@ -13,7 +13,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ILootVoteController} from "./interfaces/ILootVoteController.sol";
-import {IHolyPalPower} from "./interfaces/IHolyPalPower.sol";
 import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
 import "./libraries/Errors.sol";
 import "./utils/Owner.sol";

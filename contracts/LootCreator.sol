@@ -190,7 +190,10 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     }
 
     function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount, uint256 totalAmount) external onlyAllowedDistributor nonReentrant {
-        if(!totalQuestPeriodSet[questId][period]) totalQuestPeriodRewards[questId][period] = totalAmount;
+        if(!totalQuestPeriodSet[questId][period]) {
+            totalQuestPeriodRewards[questId][period] = totalAmount;
+            totalQuestPeriodSet[questId][period] = true;
+        }
         userQuestPeriodRewards[questId][period][user] = claimedAmount;
     }
 

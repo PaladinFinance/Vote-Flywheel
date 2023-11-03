@@ -127,9 +127,11 @@ contract Loot is Owner, ReentrancyGuard {
         }
 
         uint256[] memory ids = new uint256[](activeCount);
+        uint256 j;
         for(uint256 i; i < length;){
             if(!userLoots[user][i].claimed) {
-                ids[i] = userLoots[user][i].id;
+                ids[j] = userLoots[user][i].id;
+                unchecked { j++; }
             }
             unchecked { i++; }
         }
@@ -151,9 +153,11 @@ contract Loot is Owner, ReentrancyGuard {
         }
 
         LootData[] memory loots = new LootData[](activeCount);
+        uint256 j;
         for(uint256 i; i < length;){
             if(!userLoots[user][i].claimed) {
-                loots[i] = userLoots[user][i];
+                loots[j] = userLoots[user][i];
+                unchecked { j++; }
             }
             unchecked { i++; }
         }
@@ -179,24 +183,12 @@ contract Loot is Owner, ReentrancyGuard {
     }
 
     function claimLoot(uint256 id, address receiver) external nonReentrant {
-        _claimLoot(id, msg.sender, receiver);
-    }
-
-    function claimMultipleLoot(uint256[] calldata ids, address receiver) external nonReentrant {
-        uint256 length = ids.length;
-        for(uint256 i; i < length;){
-            _claimLoot(ids[i], msg.sender, receiver);
-            unchecked { i++; }
-        }
-    }
-
-
-    // Internal functions
-
-    function _claimLoot(uint256 id, address user, address receiver) internal {
-        LootData storage loot = userLoots[user][id];
+        if(id >= userLoots[msg.sender].length) revert Errors.InvalidId();
+        if(receiver == address(0)) revert Errors.AddressZero();
+        LootData storage loot = userLoots[msg.sender][id];
 
         if(loot.claimed) revert Errors.AlreadyClaimed();
+        if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
         loot.claimed = true;
 
         uint256 palAmount = loot.palAmount;
@@ -212,6 +204,45 @@ contract Loot is Owner, ReentrancyGuard {
 
         pal.safeTransferFrom(tokenReserve, receiver, palAmount);
         extraToken.safeTransferFrom(tokenReserve, receiver, loot.extraAmount);
+
+        emit LootClaimed(msg.sender, id, palAmount, loot.extraAmount);
+    }
+
+    function claimMultipleLoot(uint256[] calldata ids, address receiver) external nonReentrant {
+        if(receiver == address(0)) revert Errors.AddressZero();
+        uint256 length = ids.length;
+        uint256 totalPalAmount;
+        uint256 totalExtraAmount;
+
+        for(uint256 i; i < length;){
+            if(ids[i] >= userLoots[msg.sender].length) revert Errors.InvalidId();
+            LootData storage loot = userLoots[msg.sender][ids[i]];
+
+            if(loot.claimed) revert Errors.AlreadyClaimed();
+            if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
+            loot.claimed = true;
+
+            uint256 palAmount = loot.palAmount;
+            uint256 vestingEndTs = loot.startTs + vestingDuration;
+            if(block.timestamp < vestingEndTs){
+                uint256 remainingVesting = vestingEndTs - block.timestamp;
+                uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
+
+                lootCreator.notifyUndistributedRewards(slashingAmount);
+
+                palAmount -= slashingAmount;
+            }
+
+            totalPalAmount += palAmount;
+            totalExtraAmount += loot.extraAmount;
+
+            emit LootClaimed(msg.sender, ids[i], palAmount, loot.extraAmount);
+
+            unchecked { i++; }
+        }
+
+        pal.safeTransferFrom(tokenReserve, receiver, totalPalAmount);
+        extraToken.safeTransferFrom(tokenReserve, receiver, totalExtraAmount);
     }
 
 
