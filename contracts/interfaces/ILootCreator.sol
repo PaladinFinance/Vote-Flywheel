@@ -5,7 +5,7 @@ interface ILootCreator {
 
 	function createLoot(address user, uint256 questId, uint256 period) external;
 	
-	function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount, uint256 totalAmount) external;
+	function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external;
     
 	function notifyDistributedQuestPeriod(uint256 questId, uint256 period, uint256 totalRewards) external;
 	function notifyUndistributedRewards(uint256 palAmount) external;

@@ -189,11 +189,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         }
     }
 
-    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount, uint256 totalAmount) external onlyAllowedDistributor nonReentrant {
-        if(!totalQuestPeriodSet[questId][period]) {
-            totalQuestPeriodRewards[questId][period] = totalAmount;
-            totalQuestPeriodSet[questId][period] = true;
-        }
+    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor nonReentrant {
         userQuestPeriodRewards[questId][period][user] = claimedAmount;
     }
 
@@ -234,6 +230,9 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         );
 
         gaugeAllocationPerPeriod[gauge][period] = allocation;
+
+        totalQuestPeriodRewards[questId][period] = totalRewards;
+        totalQuestPeriodSet[questId][period] = true;
 
     }
 

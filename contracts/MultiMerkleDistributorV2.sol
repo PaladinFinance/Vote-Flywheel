@@ -263,8 +263,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
                 user,
                 questID,
                 period,
-                claimedAmount,
-                questRewardsPerPeriod[questID][period]
+                claimedAmount
             );
         }
     }
@@ -364,7 +363,9 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         // Add the new MerkleRoot for that Closed Period
         questMerkleRootPerPeriod[questID][period] = merkleRoot;
 
-        ILootCreator(lootCreator).notifyDistributedQuestPeriod(questID, period, totalAmount);
+        if(lootCreator != address(0)) {
+            ILootCreator(lootCreator).notifyDistributedQuestPeriod(questID, period, totalAmount);
+        }
 
         emit QuestPeriodUpdated(questID, period, merkleRoot);
 

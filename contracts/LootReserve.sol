@@ -50,7 +50,7 @@ contract LootReserve is Owner {
     }
 
     function init(address _loot) external onlyOwner {
-        if(_loot != address(0)) revert Errors.CreatorAlreadySet();
+        if(loot != address(0)) revert Errors.CreatorAlreadySet();
         loot = _loot;
 
         pal.safeApprove(_loot, type(uint256).max);
@@ -79,8 +79,8 @@ contract LootReserve is Owner {
     // Admin functions
 
     function resetMaxAllowance() external onlyOwner {
-        pal.safeApprove(loot, type(uint256).max);
-        extraToken.safeApprove(loot, type(uint256).max);
+        pal.approve(loot, type(uint256).max);
+        extraToken.approve(loot, type(uint256).max);
 
         emit MaxAllowanceSet(address(pal), loot);
         emit MaxAllowanceSet(address(extraToken), loot);
