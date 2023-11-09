@@ -34,7 +34,7 @@ const EXTRA_ADDRESS = "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"
 const EXTRA_HOLDER = "0x6cC5F688a315f3dC28A7781717a9A798a59fDA7b"
 const EXTRA_AMOUNT = ethers.utils.parseEther("250")
 
-describe('Loot contract tests', () => {
+describe('LootGauge contract tests', () => {
     let admin: SignerWithAddress
 
     let lootReserve: SignerWithAddress
@@ -159,11 +159,15 @@ describe('Loot contract tests', () => {
 
             const tx = await gauge.connect(loot).updateLootBudget()
 
+            const tx_ts = (await provider.getBlock(tx.blockNumber || 0)).timestamp
+
             expect(await pal.balanceOf(lootReserve.address)).to.be.eq(prev_pal_balance)
             expect(await extraToken.balanceOf(lootReserve.address)).to.be.eq(prev_extra_balance)
 
             expect(await lootCreator.palBudget()).to.be.eq(prev_pal_budget)
             expect(await lootCreator.extraBudget()).to.be.eq(prev_extra_budget)
+
+            expect(await controller.lastCheckpoint(gauge.address)).to.be.eq(0)
             
             expect(tx).not.to.emit(pal, "Transfer")
             expect(tx).not.to.emit(extraToken, "Transfer")
@@ -185,6 +189,8 @@ describe('Loot contract tests', () => {
 
             const tx = await gauge.connect(loot).updateLootBudget()
 
+            const tx_ts = (await provider.getBlock(tx.blockNumber || 0)).timestamp
+
             expect(await pal.balanceOf(lootReserve.address)).to.be.eq(prev_pal_balance.add(pal_budget))
             expect(await extraToken.balanceOf(lootReserve.address)).to.be.eq(prev_extra_balance.add(extra_budget))
 
@@ -193,6 +199,8 @@ describe('Loot contract tests', () => {
 
             expect(await lootCreator.palBudget()).to.be.eq(prev_pal_budget.add(pal_budget))
             expect(await lootCreator.extraBudget()).to.be.eq(prev_extra_budget.add(extra_budget))
+
+            expect(await controller.lastCheckpoint(gauge.address)).to.be.eq(tx_ts)
             
             expect(tx).to.emit(pal, "Transfer").withArgs(controller.address, lootReserve.address, pal_budget)
             expect(tx).to.emit(extraToken, "Transfer").withArgs(controller.address, lootReserve.address, extra_budget)

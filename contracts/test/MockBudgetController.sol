@@ -13,12 +13,15 @@ contract MockBudgetController {
     mapping(address => uint256) public palBudget;
     mapping(address => uint256) public extraBudget;
 
+    mapping(address => uint256) public lastCheckpoint;
+
     constructor(address _pal, address _extra) {
         pal = _pal;
         extra = _extra;
     }
 
     function checkpoint(address gauge) external returns(bool) {
+        lastCheckpoint[gauge] = block.timestamp;
         return true;
     }
 

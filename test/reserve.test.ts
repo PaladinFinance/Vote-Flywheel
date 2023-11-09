@@ -30,7 +30,7 @@ const EXTRA_ADDRESS = "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"
 const EXTRA_HOLDER = "0x6cC5F688a315f3dC28A7781717a9A798a59fDA7b"
 const EXTRA_AMOUNT = ethers.utils.parseEther("250")
 
-describe('Loot contract tests', () => {
+describe('LootReserve contract tests', () => {
     let admin: SignerWithAddress
 
     let loot: SignerWithAddress
