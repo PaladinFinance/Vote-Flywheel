@@ -159,8 +159,6 @@ describe('LootGauge contract tests', () => {
 
             const tx = await gauge.connect(loot).updateLootBudget()
 
-            const tx_ts = (await provider.getBlock(tx.blockNumber || 0)).timestamp
-
             expect(await pal.balanceOf(lootReserve.address)).to.be.eq(prev_pal_balance)
             expect(await extraToken.balanceOf(lootReserve.address)).to.be.eq(prev_extra_balance)
 
@@ -168,7 +166,7 @@ describe('LootGauge contract tests', () => {
             expect(await lootCreator.extraBudget()).to.be.eq(prev_extra_budget)
 
             expect(await controller.lastCheckpoint(gauge.address)).to.be.eq(0)
-            
+
             expect(tx).not.to.emit(pal, "Transfer")
             expect(tx).not.to.emit(extraToken, "Transfer")
 
@@ -201,7 +199,7 @@ describe('LootGauge contract tests', () => {
             expect(await lootCreator.extraBudget()).to.be.eq(prev_extra_budget.add(extra_budget))
 
             expect(await controller.lastCheckpoint(gauge.address)).to.be.eq(tx_ts)
-            
+
             expect(tx).to.emit(pal, "Transfer").withArgs(controller.address, lootReserve.address, pal_budget)
             expect(tx).to.emit(extraToken, "Transfer").withArgs(controller.address, lootReserve.address, extra_budget)
 

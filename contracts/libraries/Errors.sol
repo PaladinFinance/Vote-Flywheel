@@ -9,6 +9,7 @@ library Errors {
     error InvalidParameter();
     error SameAddress();
     error ArraySizeMismatch();
+    error AlreadyInitialized();
 
     // Access Control
     error CannotBeOwner();

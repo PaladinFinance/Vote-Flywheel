@@ -70,6 +70,9 @@ contract LootGauge is Owner, ReentrancyGuard {
 
         IPaladinBudgetController(budgetController).checkpoint(address(this));
 
+        (uint256 palBudget, uint256 extraBudget) = IPaladinBudgetController(budgetController).getCurrentBudget(address(this));
+        if(palBudget == 0 && extraBudget == 0) return;
+
         (uint256 palAmount, uint256 extraAmount) = IPaladinBudgetController(budgetController).sendBudget(address(this), lootReserve);
 
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);

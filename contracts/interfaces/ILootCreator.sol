@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 interface ILootCreator {
 
-	function createLoot(address user, uint256 questId, uint256 period) external;
+	function createLoot(address user, address distributor, uint256 questId, uint256 period) external;
 	
 	function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external;
     
