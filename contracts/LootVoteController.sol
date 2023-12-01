@@ -13,7 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ILootVoteController} from "./interfaces/ILootVoteController.sol";
-import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
+import {IHolyPalPower} from "./interfaces/IHolyPalPower.sol";
 import "./libraries/Errors.sol";
 import "./utils/Owner.sol";
 
@@ -93,8 +93,6 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     // Last user vote's timestamp for each gauge address
     mapping(address => mapping(address => uint256)) public lastUserVote;
 
-    mapping(address => mapping(address => IHolyPowerDelegation.SlopeChange[])) public userSlopeChanges;
-
     // gauge_addr -> time -> Point
     mapping(address => mapping(uint256 => Point)) public pointsWeight;
     // gauge_addr -> time -> slope
@@ -134,6 +132,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         hPalPower = _hPalPower;
 
         nextBoardId++;
+
+        timeTotal = (block.timestamp) / WEEK * WEEK;
     }
 
 
@@ -160,6 +160,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         return pointsWeight[gauge][ts].bias;
     }
 
+    function getTotalWeight() external view returns(uint256) {
+        return pointsWeightTotal[timeTotal].bias;
+    }
+
     function getGaugeRelativeWeight(address gauge) external view returns(uint256) {
         return _getGaugeRelativeWeight(gauge, block.timestamp);
     }
@@ -169,7 +173,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     }
 
     function getGaugeCap(address gauge) external view returns(uint256) {
-        return gaugeCaps[gauge];
+        return gaugeCaps[gauge] != 0 ? gaugeCaps[gauge] : defaultCap;
     }
 
 
@@ -182,9 +186,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external nonReentrant {
         uint256 length = gauge.length;
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
-        for(uint256 i; i < length;) {
+        for(uint256 i; i < length; i++) {
             _voteForGauge(msg.sender, gauge[i], userPower[i]);
-            unchecked { ++i; }
         }
     }
 
@@ -220,9 +223,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         
         vars.currentPeriod = (block.timestamp) / WEEK * WEEK;
         vars.nextPeriod = vars.currentPeriod + WEEK;
-        vars.userSlope = IHolyPowerDelegation(hPalPower).getUserPointAt(user, vars.currentPeriod).slope;
-        vars.userLockEnd = IHolyPowerDelegation(hPalPower).locked__end(user);
+        vars.userSlope = IHolyPalPower(hPalPower).getUserPointAt(user, vars.currentPeriod).slope;
+        vars.userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
 
+        if(!_isGaugeListed(gauge)) revert Errors.NotListed();
         if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
@@ -257,8 +261,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
             pointsWeight[gauge][vars.nextPeriod].slope = max(vars.oldWeightSlope + newSlope.slope, oldSlope.slope) - oldSlope.slope;
             pointsWeightTotal[vars.nextPeriod].slope = max(vars.oldTotalSlope + newSlope.slope, oldSlope.slope) - oldSlope.slope;
         } else {
-            pointsWeight[gauge][vars.nextPeriod].slope = newSlope.slope;
-            pointsWeightTotal[vars.nextPeriod].slope = newSlope.slope;
+            pointsWeight[gauge][vars.nextPeriod].slope += newSlope.slope;
+            pointsWeightTotal[vars.nextPeriod].slope += newSlope.slope;
         }
 
         if(oldSlope.end > block.timestamp) {
@@ -268,51 +272,15 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         changesWeight[gauge][newSlope.end] += newSlope.slope;
         changesWeightTotal[newSlope.end] += newSlope.slope;
 
-        _updateUserSlopeChanges(user, gauge, userPower);
-
-        _updateTotalWeight();
-
         voteUserSlopes[user][gauge] = newSlope;
         lastUserVote[user][gauge] = block.timestamp;
 
         emit VoteForGauge(block.timestamp, user, gauge, userPower);
     }
 
-    function _updateUserSlopeChanges(address user, address gauge, uint256 userPower) internal {
-       IHolyPowerDelegation.SlopeChange[] memory oldUserChanges = userSlopeChanges[user][gauge];
-        uint256 length = oldUserChanges.length;
-        if(length > 0) {
-            for(uint256 i; i < length;) {
-                if(oldUserChanges[i].endTimestamp < block.timestamp) continue;
-
-                changesWeight[gauge][oldUserChanges[i].endTimestamp] -= oldUserChanges[i].slopeChange;
-                changesWeightTotal[oldUserChanges[i].endTimestamp] -= oldUserChanges[i].slopeChange;
-
-                unchecked { ++i; }
-            }
-        }
-
-        delete userSlopeChanges[user][gauge];
-
-        if(userPower == 0) return;
-
-        IHolyPowerDelegation.SlopeChange[] memory newUserChanges = IHolyPowerDelegation(hPalPower).getUserSlopeChanges(user);
-        length = newUserChanges.length;
-        if(length == 0) return;
-
-        for(uint256 i; i < length;) {
-            if(newUserChanges[i].endTimestamp < block.timestamp) continue;
-
-            newUserChanges[i].slopeChange = (newUserChanges[i].slopeChange * userPower) / MAX_BPS;
-
-            changesWeight[gauge][newUserChanges[i].endTimestamp] += newUserChanges[i].slopeChange;
-            changesWeightTotal[newUserChanges[i].endTimestamp] += newUserChanges[i].slopeChange;
-
-            unchecked { ++i; }
-        }
-    }
-
     function _getGaugeRelativeWeight(address gauge, uint256 ts) internal view returns(uint256) {
+        if(isGaugeKilled[gauge]) return 0;
+
         ts = ts / WEEK * WEEK;
 
         uint256 _totalWeight = pointsWeightTotal[ts].bias;
@@ -327,12 +295,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeight[gauge][ts];
-        for(uint256 i; i < 50;) {
+        for(uint256 i; i < 100; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
             uint256 decreaseBias = _point.slope * WEEK;
-            if(decreaseBias > _point.bias) {
+            if(decreaseBias >= _point.bias) {
                 _point.bias = 0;
                 _point.slope = 0;
             } else {
@@ -346,8 +314,6 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
             if(ts > block.timestamp) {
                 timeWeight[gauge] = ts;
             }
-
-            unchecked { ++i; }
         }
 
         return _point.bias;
@@ -359,12 +325,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeightTotal[ts];
-        for(uint256 i; i < 50;) {
+        for(uint256 i; i < 100; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
             uint256 decreaseBias = _point.slope * WEEK;
-            if(decreaseBias > _point.bias) {
+            if(decreaseBias >= _point.bias) {
                 _point.bias = 0;
                 _point.slope = 0;
             } else {
@@ -378,8 +344,6 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
             if(ts > block.timestamp) {
                 timeTotal = ts;
             }
-
-            unchecked { ++i; }
         }
 
         return _point.bias;
@@ -390,7 +354,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     function addNewBoard(address board, address distributor) external onlyOwner {
         if(board == address(0) || distributor == address(0)) revert Errors.AddressZero();
-        if(boardToId[board] != 0) revert Errors.AlreadyListed();
+        if(boardToId[board] != 0 || distributorToId[distributor] != 0) revert Errors.AlreadyListed();
         
         uint256 boardId = nextBoardId;
         nextBoardId++;
@@ -429,7 +393,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     function updateGaugeCap(address gauge, uint256 newCap) external onlyOwner {
         if(gauge == address(0)) revert Errors.AddressZero();
-        if(!isGaugeKilled[gauge]) revert Errors.InvalidParameter();
+        if(gaugeToBoardId[gauge] == 0) revert Errors.InvalidParameter();
+        if(isGaugeKilled[gauge]) revert Errors.KilledGauge();
 
         gaugeCaps[gauge] = newCap;
 
@@ -438,7 +403,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     function killGauge(address gauge) external onlyOwner {
         if(gauge == address(0)) revert Errors.AddressZero();
-        if(!isGaugeKilled[gauge]) revert Errors.InvalidParameter();
+        if(!_isGaugeListed(gauge)) revert Errors.NotListed();
+        if(isGaugeKilled[gauge]) revert Errors.KilledGauge();
 
         isGaugeKilled[gauge] = true;
 
@@ -447,7 +413,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     function unkillGauge(address gauge) external onlyOwner {
         if(gauge == address(0)) revert Errors.AddressZero();
-        if(isGaugeKilled[gauge]) revert Errors.InvalidParameter();
+        if(!isGaugeKilled[gauge]) revert Errors.NotKilledGauge();
 
         isGaugeKilled[gauge] = false;
 

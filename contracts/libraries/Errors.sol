@@ -42,6 +42,8 @@ library Errors {
     error VotingPowerInvalid();
     error VotingPowerExceeded();
     error VotingCooldown();
+    error KilledGauge();
+    error NotKilledGauge();
 
     // Loot
     error CreatorAlreadySet();

@@ -46,6 +46,7 @@ const config: HardhatUserConfig = {
         url: "https://eth-mainnet.alchemyapi.io/v2/" + (process.env.ALCHEMY_API_KEY || ''),
         blockNumber: 18428190,
       },
+      gas: 30000000,
     },
     mainnet: {
       url: process.env.MAINNET_URI || '',
