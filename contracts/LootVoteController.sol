@@ -53,6 +53,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         uint256 slope;
         uint256 power;
         uint256 end;
+        address caller;
     }
 
     struct VoteVars {
@@ -63,10 +64,17 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         uint256 oldBias;
         uint256 newBias;
         uint256 totalPowerUsed;
+        uint256 oldUsedPower;
         uint256 oldWeightBias;
         uint256 oldWeightSlope;
         uint256 oldTotalBias;
         uint256 oldTotalSlope;
+    }
+
+    struct ProxyManager {
+        uint256 maxPower;
+        uint256 usedPower;
+        uint256 endTimestamp;
     }
 
 
@@ -107,6 +115,18 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     // last scheduled time
     uint256 public timeTotal;
 
+    // user -> proxy voter -> bool
+    mapping(address => mapping(address => bool)) public isProxyManager;
+
+    // user -> proxy voter -> state
+    mapping(address => mapping(address => ProxyManager)) public proxyManagerState;
+
+    mapping(address => address[]) public currentUserProxyVoters;
+
+    mapping(address => uint256) public blockedProxyPower;
+    mapping(address => uint256) public usedFreePower;
+
+
 
     // Events
 
@@ -124,6 +144,9 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     event GaugeCapUpdated(address indexed gauge, uint256 indexed boardId, uint256 newCap);
     event GaugeKilled(address indexed gauge, uint256 indexed boardId);
     event GaugeUnkilled(address indexed gauge, uint256 indexed boardId);
+
+    event SetProxyManager(address indexed user, address indexed manager);
+    event SetNewProxyVoter(address indexed user, address indexed proxyVoter, uint256 maxPower, uint256 endTimestamp);
 
 
     // Constructor
@@ -176,19 +199,47 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         return gaugeCaps[gauge] != 0 ? gaugeCaps[gauge] : defaultCap;
     }
 
+    function getUserProxyVoters(address user) external view returns(address[] memory) {
+        return currentUserProxyVoters[user];
+    }
+
 
     // State-changing functions
 
     function voteForGaugeWeights(address gauge, uint256 userPower) external nonReentrant {
-        _voteForGauge(msg.sender, gauge, userPower);
+        _voteForGauge(msg.sender, gauge, userPower, msg.sender);
     }
 
     function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external nonReentrant {
         uint256 length = gauge.length;
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
         for(uint256 i; i < length; i++) {
-            _voteForGauge(msg.sender, gauge[i], userPower[i]);
+            _voteForGauge(msg.sender, gauge[i], userPower[i], msg.sender);
         }
+    }
+
+    function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external nonReentrant {
+        ProxyManager memory proxyState = proxyManagerState[user][msg.sender];
+        if(proxyState.maxPower == 0) revert Errors.NotAllowedManager();
+        if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
+        if(userPower > proxyState.maxPower) revert Errors.VotingPowerProxyExceeded();
+
+        _voteForGauge(user, gauge, userPower, msg.sender);
+    }
+
+    function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external nonReentrant {
+        ProxyManager memory proxyState = proxyManagerState[user][msg.sender];
+        if(proxyState.maxPower == 0) revert Errors.NotAllowedManager();
+        if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
+        uint256 totalPower;
+
+        uint256 length = gauge.length;
+        if(length != userPower.length) revert Errors.ArraySizeMismatch();
+        for(uint256 i; i < length; i++) {
+            totalPower += userPower[i];
+            _voteForGauge(user, gauge[i], userPower[i], msg.sender);
+        }
+        if(totalPower > proxyState.maxPower) revert Errors.VotingPowerProxyExceeded();
     }
 
     function getGaugeRelativeWeightWrite(address gauge) external returns(uint256) {
@@ -211,6 +262,45 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         _updateTotalWeight();
     }
 
+    function approveProxyManager(address manager) external {
+        if(manager == address(0)) revert Errors.AddressZero();
+
+        isProxyManager[msg.sender][manager] = true;
+
+        emit SetProxyManager(msg.sender, manager);
+    }
+
+    function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external nonReentrant {
+        if(!isProxyManager[user][msg.sender] && msg.sender != user) revert Errors.NotAllowedManager();
+        if(maxPower == 0 || maxPower > MAX_BPS) revert Errors.VotingPowerInvalid();
+        endTimestamp = endTimestamp / WEEK * WEEK;
+        uint256 userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
+        if(endTimestamp < block.timestamp || endTimestamp > userLockEnd) revert Errors.InvalidTimestamp();
+
+        _clearExpiredProxies(user);
+
+        ProxyManager memory prevProxyState = proxyManagerState[user][proxy];
+        if(prevProxyState.maxPower != 0) revert Errors.ProxyAlreadyActive();
+
+        uint256 userBlockedPower = blockedProxyPower[user];
+        if(userBlockedPower + maxPower > MAX_BPS) revert Errors.ProxyPowerExceeded();
+        blockedProxyPower[user] = userBlockedPower + maxPower;
+
+        proxyManagerState[user][proxy] = ProxyManager({
+            maxPower: maxPower,
+            usedPower: 0,
+            endTimestamp: endTimestamp
+        });
+
+        currentUserProxyVoters[user].push(proxy);
+
+        emit SetNewProxyVoter(user, proxy, maxPower, endTimestamp);
+    }
+
+    function clearUserExpiredProxies(address user) external {
+        _clearExpiredProxies(user);
+    }
+
 
     // Internal functions
 
@@ -218,7 +308,26 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         return gaugeToBoardId[gauge] != 0;
     }
 
-    function _voteForGauge(address user, address gauge, uint256 userPower) internal {
+    function _clearExpiredProxies(address user) internal {
+        address[] memory proxies = currentUserProxyVoters[user];
+        uint256 length = proxies.length;
+        if(length == 0) return;
+        uint256 lastIndex = length - 1;
+        for(uint256 i; i < length; i++) {
+            address proxyVoter = proxies[i];
+            if(proxyManagerState[user][proxyVoter].endTimestamp < block.timestamp) {
+                blockedProxyPower[user] -= proxyManagerState[user][proxyVoter].maxPower;
+                delete proxyManagerState[user][proxyVoter];
+                
+                if(i != lastIndex) {
+                    currentUserProxyVoters[user][i] = currentUserProxyVoters[user][length-1];
+                }
+                currentUserProxyVoters[user].pop();
+            }
+        }
+    }
+
+    function _voteForGauge(address user, address gauge, uint256 userPower, address caller) internal {
         VoteVars memory vars;
         
         vars.currentPeriod = (block.timestamp) / WEEK * WEEK;
@@ -231,6 +340,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
 
+        _clearExpiredProxies(user);
+
         VotedSlope memory oldSlope = voteUserSlopes[user][gauge];
         if(oldSlope.end > vars.nextPeriod) {
             vars.oldBias = oldSlope.slope * (oldSlope.end - vars.nextPeriod);
@@ -239,12 +350,34 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         VotedSlope memory newSlope = VotedSlope({
             slope: (convertInt128ToUint128(vars.userSlope) * userPower) / MAX_BPS,
             power: userPower,
-            end: vars.userLockEnd
+            end: vars.userLockEnd,
+            caller: caller
         });
         vars.newBias = newSlope.slope * (vars.userLockEnd - vars.nextPeriod);
 
+        if(
+            oldSlope.caller != caller && proxyManagerState[user][oldSlope.caller].endTimestamp > block.timestamp
+        ) revert Errors.NotAllowedVoteChange();
+
         vars.totalPowerUsed = voteUserPower[user];
         vars.totalPowerUsed = vars.totalPowerUsed + newSlope.power - oldSlope.power;
+        if(user == caller) {
+            uint256 usedPower = usedFreePower[user];
+            vars.oldUsedPower = oldSlope.caller != user ? 0 : oldSlope.power;
+            usedPower = usedPower + newSlope.power - vars.oldUsedPower;
+            if(usedPower > (MAX_BPS - blockedProxyPower[user])) revert Errors.VotingPowerExceeded();
+            usedFreePower[user] = usedPower;
+        } else {
+            uint256 proxyPower = proxyManagerState[user][caller].usedPower;
+            vars.oldUsedPower = oldSlope.caller == caller ? oldSlope.power : 0;
+            proxyPower = proxyPower + newSlope.power - vars.oldUsedPower;
+            if(oldSlope.caller == user) {
+                usedFreePower[user] -= oldSlope.power;
+            }
+            if(proxyPower > proxyManagerState[user][caller].maxPower) revert Errors.VotingPowerProxyExceeded();
+
+            proxyManagerState[user][caller].usedPower = proxyPower;
+        }
         if(vars.totalPowerUsed > MAX_BPS) revert Errors.VotingPowerExceeded();
         voteUserPower[user] = vars.totalPowerUsed;
 

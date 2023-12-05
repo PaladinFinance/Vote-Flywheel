@@ -37,6 +37,10 @@ describe('LootVoteController contract tests', () => {
     let user2: SignerWithAddress
     let user3: SignerWithAddress
 
+    let manager: SignerWithAddress
+    let proxyVoter1: SignerWithAddress
+    let proxyVoter2: SignerWithAddress
+
     let board1: SignerWithAddress
     let board2: SignerWithAddress
     let board3: SignerWithAddress
@@ -63,7 +67,7 @@ describe('LootVoteController contract tests', () => {
     before(async () => {
         await resetFork();
 
-        [admin, user1, user2, user3, board1, board2, board3, distributor1, distributor2, distributor3, newDistributor, gauge1, gauge2, gauge3, gauge4, gauge5] = await ethers.getSigners();
+        [admin, user1, user2, user3, manager, proxyVoter1, proxyVoter2, board1, board2, board3, distributor1, distributor2, distributor3, newDistributor, gauge1, gauge2, gauge3, gauge4, gauge5] = await ethers.getSigners();
 
         controllerFactory = await ethers.getContractFactory("LootVoteController");
         powerFactory = await ethers.getContractFactory("MockPowerDelegation");
@@ -1099,6 +1103,7 @@ describe('LootVoteController contract tests', () => {
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
 
             expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.add(vote_power))
+            expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_used_power.add(vote_power))
 
             const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
             const new_total_point = await controller.pointsWeightTotal(next_period)
@@ -1121,6 +1126,7 @@ describe('LootVoteController contract tests', () => {
             expect(last_user_vote_slope.slope).to.be.eq(expected_vote_slope)
             expect(last_user_vote_slope.power).to.be.eq(vote_power)
             expect(last_user_vote_slope.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope.caller).to.be.eq(user1.address)
             
             expect(tx).to.emit(controller, "VoteForGauge").withArgs(
                 tx_ts,
@@ -1161,6 +1167,7 @@ describe('LootVoteController contract tests', () => {
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
 
             expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.sub(vote_power))
+            expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_used_power.sub(vote_power))
 
             const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
             const new_total_point = await controller.pointsWeightTotal(next_period)
@@ -3023,6 +3030,1565 @@ describe('LootVoteController contract tests', () => {
             expect(await controller['getGaugeRelativeWeight(address)'](gauge2.address)).to.be.eq(0)
             expect(await controller['getGaugeRelativeWeight(address)'](gauge3.address)).to.be.eq(0)
             expect(await controller['getGaugeRelativeWeight(address)'](gauge4.address)).to.be.eq(0)
+
+        });
+    
+    });
+
+    describe('approveProxyManager', async () => {
+
+        it(' should approve the proxy manager correctly', async () => {
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
+
+            const tx = await controller.connect(user1).approveProxyManager(manager.address)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            await expect(tx).to.emit(controller, 'SetProxyManager').withArgs(user1.address, manager.address)
+
+        });
+
+        it(' should fail if given address 0x0', async () => {
+
+            await expect(
+                controller.connect(user1).approveProxyManager(ethers.constants.AddressZero)
+            ).to.be.revertedWith('AddressZero')
+
+        });
+    
+    });
+
+    describe('setVoterProxy', async () => {
+
+        let board1_id: BigNumber
+        let board2_id: BigNumber
+
+        const gauge2_cap = ethers.utils.parseEther("0.15")
+
+        const proxy_duration = WEEK.mul(4)
+
+        const proxy_power = 3500
+
+        beforeEach(async () => {
+
+            board1_id = await controller.nextBoardId()
+            board2_id = board1_id.add(1)
+
+            await controller.connect(admin).addNewBoard(
+                board1.address,
+                distributor1.address,
+            )
+            await controller.connect(admin).addNewBoard(
+                board2.address,
+                distributor2.address,
+            )
+
+            await controller.connect(admin).addNewGauge(
+                gauge1.address,
+                board1_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge2.address,
+                board1_id,
+                gauge2_cap
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge3.address,
+                board2_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge4.address,
+                board2_id,
+                0
+            )
+
+            const current_block = (await provider.getBlock('latest')).number
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const user1_slope = ethers.utils.parseEther("2500").div(WEEK.mul(104))
+            const user2_slope = ethers.utils.parseEther("4750").div(WEEK.mul(104))
+
+            const user1_point = {
+                bias: user1_slope.mul(WEEK.mul(104)),
+                slope: user1_slope,
+                endTimestamp: current_ts.add(WEEK.mul(85)),
+                blockNumber: current_block - 500,
+            }
+            const user2_point = {
+                bias: user2_slope.mul(WEEK.mul(104)),
+                slope: user2_slope,
+                endTimestamp: current_ts.add(WEEK.mul(96)),
+                blockNumber: current_block - 355,
+            }
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts,
+                user1_point
+            )
+            await power.connect(admin).setUserPointAt(
+                user2.address, 
+                current_ts,
+                user2_point
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+            await power.connect(admin).setUserPointAt(
+                user2.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user2_slope.mul(WEEK.mul(104)),
+                    slope: user2_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(96)),
+                    blockNumber: current_block - 355,
+                }
+            )
+
+            await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
+            await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
+
+            await controller.connect(user1).approveProxyManager(manager.address)
+
+        });
+
+        it(' should set a new proxy correctly', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const end_ts = current_ts.add(proxy_duration)
+
+            const prev_blocked_power = await controller.blockedProxyPower(user1.address)
+            const old_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            const tx = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, end_ts)
+
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power.add(proxy_power))
+            
+            const new_proxy_list = await controller.getUserProxyVoters(user1.address)
+            expect(new_proxy_list.length).to.be.eq(old_proxy_list.length + 1)
+            expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter1.address)
+
+            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+
+            expect(proxy_state.maxPower).to.be.eq(proxy_power)
+            expect(proxy_state.usedPower).to.be.eq(0)
+            expect(proxy_state.endTimestamp).to.be.eq(end_ts)
+
+            await expect(tx).to.emit(controller, 'SetNewProxyVoter').withArgs(user1.address, proxyVoter1.address, proxy_power, end_ts)
+
+        });
+
+        it(' should allow to create multiple proxy from the same user', async () => {
+
+            const proxy_duration2 = WEEK.mul(7)
+    
+            const proxy_power2 = 2000
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const end_ts = current_ts.add(proxy_duration)
+            const end_ts2 = current_ts.add(proxy_duration2)
+
+            const prev_blocked_power = await controller.blockedProxyPower(user1.address)
+            const old_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            const tx = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, end_ts)
+            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+
+            expect(proxy_state.maxPower).to.be.eq(proxy_power)
+            expect(proxy_state.usedPower).to.be.eq(0)
+            expect(proxy_state.endTimestamp).to.be.eq(end_ts)
+
+            await expect(tx).to.emit(controller, 'SetNewProxyVoter').withArgs(user1.address, proxyVoter1.address, proxy_power, end_ts)
+
+            const tx2 = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power2, end_ts2)
+
+            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+
+            expect(proxy_state2.maxPower).to.be.eq(proxy_power2)
+            expect(proxy_state2.usedPower).to.be.eq(0)
+            expect(proxy_state2.endTimestamp).to.be.eq(end_ts2)
+
+            await expect(tx2).to.emit(controller, 'SetNewProxyVoter').withArgs(user1.address, proxyVoter2.address, proxy_power2, end_ts2)
+
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power.add(proxy_power).add(proxy_power2))
+            
+            const new_proxy_list = await controller.getUserProxyVoters(user1.address)
+            expect(new_proxy_list.length).to.be.eq(old_proxy_list.length + 2)
+            expect(new_proxy_list[new_proxy_list.length - 2]).to.be.eq(proxyVoter1.address)
+            expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter2.address)
+
+        });
+
+        it(' should clear previous expired proxies', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 2000, current_ts.add(proxy_duration))
+
+            await advanceTime(WEEK.mul(5).toNumber())
+
+            current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            let end_ts = current_ts.add(proxy_duration)
+
+            const old_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            const tx = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power, end_ts)
+
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(proxy_power)
+            
+            const new_proxy_list = await controller.getUserProxyVoters(user1.address)
+            expect(new_proxy_list.length).to.be.eq(old_proxy_list.length)
+            expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter2.address)
+
+            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+
+            expect(proxy_state.maxPower).to.be.eq(proxy_power)
+            expect(proxy_state.usedPower).to.be.eq(0)
+            expect(proxy_state.endTimestamp).to.be.eq(end_ts)
+
+            const old_proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+
+            expect(old_proxy_state.maxPower).to.be.eq(0)
+            expect(old_proxy_state.usedPower).to.be.eq(0)
+            expect(old_proxy_state.endTimestamp).to.be.eq(0)
+
+            await expect(tx).to.emit(controller, 'SetNewProxyVoter').withArgs(user1.address, proxyVoter2.address, proxy_power, end_ts)
+
+        });
+
+        it(' should not allow to create the same proxy of not expired', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 2000, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('ProxyAlreadyActive')
+
+            await advanceTime(WEEK.mul(2).toNumber())
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('ProxyAlreadyActive')
+            
+        });
+
+        it(' should allow the manager to create a proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const end_ts = current_ts.add(proxy_duration)
+
+            const prev_blocked_power = await controller.blockedProxyPower(user1.address)
+            const old_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            const tx = await controller.connect(manager).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, end_ts)
+
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power.add(proxy_power))
+            
+            const new_proxy_list = await controller.getUserProxyVoters(user1.address)
+            expect(new_proxy_list.length).to.be.eq(old_proxy_list.length + 1)
+            expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter1.address)
+
+            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+
+            expect(proxy_state.maxPower).to.be.eq(proxy_power)
+            expect(proxy_state.usedPower).to.be.eq(0)
+            expect(proxy_state.endTimestamp).to.be.eq(end_ts)
+
+            await expect(tx).to.emit(controller, 'SetNewProxyVoter').withArgs(user1.address, proxyVoter1.address, proxy_power, end_ts)
+
+        });
+
+        it(' should fail if the caller is not allowed to create a proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await expect(
+                controller.connect(user2).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('NotAllowedManager')
+
+            await expect(
+                controller.connect(proxyVoter1).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('NotAllowedManager')
+        });
+
+        it(' should fail if given an invalid vote power', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 0, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('VotingPowerInvalid')
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 11000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('VotingPowerInvalid')
+
+        });
+
+        it(' should fail if given an invalid timestamp', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 3500, current_ts.sub(WEEK.mul(2)))
+            ).to.be.revertedWith('InvalidTimestamp')
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 3500, current_ts.add(WEEK.mul(150)))
+            ).to.be.revertedWith('InvalidTimestamp')
+
+        });
+
+        it(' should not allow to go over the max voting power', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, 6500, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(2)))
+            ).to.be.revertedWith('ProxyPowerExceeded')
+
+        });
+    
+    });
+
+    describe('clearUserExpiredProxies', async () => {
+
+        let board1_id: BigNumber
+        let board2_id: BigNumber
+
+        const gauge2_cap = ethers.utils.parseEther("0.15")
+
+        const proxy_duration = WEEK.mul(4)
+        const proxy_duration2 = WEEK.mul(8)
+
+        const proxy_power = 3500
+        const proxy_power2 = 2000
+
+        beforeEach(async () => {
+
+            board1_id = await controller.nextBoardId()
+            board2_id = board1_id.add(1)
+
+            await controller.connect(admin).addNewBoard(
+                board1.address,
+                distributor1.address,
+            )
+            await controller.connect(admin).addNewBoard(
+                board2.address,
+                distributor2.address,
+            )
+
+            await controller.connect(admin).addNewGauge(
+                gauge1.address,
+                board1_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge2.address,
+                board1_id,
+                gauge2_cap
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge3.address,
+                board2_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge4.address,
+                board2_id,
+                0
+            )
+
+            const current_block = (await provider.getBlock('latest')).number
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const user1_slope = ethers.utils.parseEther("2500").div(WEEK.mul(104))
+            const user2_slope = ethers.utils.parseEther("4750").div(WEEK.mul(104))
+
+            const user1_point = {
+                bias: user1_slope.mul(WEEK.mul(104)),
+                slope: user1_slope,
+                endTimestamp: current_ts.add(WEEK.mul(85)),
+                blockNumber: current_block - 500,
+            }
+            const user2_point = {
+                bias: user2_slope.mul(WEEK.mul(104)),
+                slope: user2_slope,
+                endTimestamp: current_ts.add(WEEK.mul(96)),
+                blockNumber: current_block - 355,
+            }
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts,
+                user1_point
+            )
+            await power.connect(admin).setUserPointAt(
+                user2.address, 
+                current_ts,
+                user2_point
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+            await power.connect(admin).setUserPointAt(
+                user2.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user2_slope.mul(WEEK.mul(104)),
+                    slope: user2_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(96)),
+                    blockNumber: current_block - 355,
+                }
+            )
+
+            await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
+            await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
+
+            await controller.connect(user1).approveProxyManager(manager.address)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power2, current_ts.add(proxy_duration2))
+
+        });
+
+        it(' should not clear anything if not expired', async () => {
+
+            await advanceTime(WEEK.mul(1).toNumber())
+
+            const prev_user_proxy_list = await controller.getUserProxyVoters(user1.address)
+            const prev_blocked_power = await controller.blockedProxyPower(user1.address)
+
+            await controller.connect(user1).clearUserExpiredProxies(user1.address)
+
+            const new_user_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            expect(new_user_proxy_list.length).to.be.eq(prev_user_proxy_list.length)
+            expect(new_user_proxy_list).to.be.deep.eq(prev_user_proxy_list)
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power)
+
+            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            
+            expect(proxy_state1.maxPower).not.to.be.eq(0)
+            expect(proxy_state2.maxPower).not.to.be.eq(0)
+
+            expect(proxy_state1.endTimestamp).not.to.be.eq(0)
+            expect(proxy_state2.endTimestamp).not.to.be.eq(0)
+
+        });
+
+        it(' should clear only the expired ones', async () => {
+
+            await advanceTime(WEEK.mul(5).toNumber())
+
+            const prev_user_proxy_list = await controller.getUserProxyVoters(user1.address)
+            const prev_blocked_power = await controller.blockedProxyPower(user1.address)
+
+            await controller.connect(user1).clearUserExpiredProxies(user1.address)
+
+            const new_user_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            expect(new_user_proxy_list.length).to.be.eq(prev_user_proxy_list.length - 1)
+            expect(new_user_proxy_list).not.to.be.deep.eq(prev_user_proxy_list)
+            expect(new_user_proxy_list.includes(proxyVoter1.address)).to.be.false
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power.sub(proxy_power))
+
+            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            
+            expect(proxy_state1.maxPower).to.be.eq(0)
+            expect(proxy_state2.maxPower).not.to.be.eq(0)
+
+            expect(proxy_state1.endTimestamp).to.be.eq(0)
+            expect(proxy_state2.endTimestamp).not.to.be.eq(0)
+
+        });
+
+        it(' should clear everything if all is expired', async () => {
+
+            await advanceTime(WEEK.mul(10).toNumber())
+
+            await controller.connect(user1).clearUserExpiredProxies(user1.address)
+
+            const new_user_proxy_list = await controller.getUserProxyVoters(user1.address)
+
+            expect(new_user_proxy_list).to.be.deep.eq([])
+            expect(new_user_proxy_list.length).to.be.eq(0)
+            expect(new_user_proxy_list.includes(proxyVoter1.address)).to.be.false
+            expect(new_user_proxy_list.includes(proxyVoter2.address)).to.be.false
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(0)
+
+            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            
+            expect(proxy_state1.maxPower).to.be.eq(0)
+            expect(proxy_state2.maxPower).to.be.eq(0)
+
+            expect(proxy_state1.endTimestamp).to.be.eq(0)
+            expect(proxy_state2.endTimestamp).to.be.eq(0)
+
+        });
+    
+    });
+
+    describe('voteForGaugeWeightsFor', async () => {
+
+        let board1_id: BigNumber
+        let board2_id: BigNumber
+
+        const gauge2_cap = ethers.utils.parseEther("0.15")
+
+        const proxy_duration = WEEK.mul(4)
+
+        const proxy_power = 5500
+
+        beforeEach(async () => {
+
+            board1_id = await controller.nextBoardId()
+            board2_id = board1_id.add(1)
+
+            await controller.connect(admin).addNewBoard(
+                board1.address,
+                distributor1.address,
+            )
+            await controller.connect(admin).addNewBoard(
+                board2.address,
+                distributor2.address,
+            )
+
+            await controller.connect(admin).addNewGauge(
+                gauge1.address,
+                board1_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge2.address,
+                board1_id,
+                gauge2_cap
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge3.address,
+                board2_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge4.address,
+                board2_id,
+                0
+            )
+
+            const current_block = (await provider.getBlock('latest')).number
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const user1_slope = ethers.utils.parseEther("2500").div(WEEK.mul(104))
+
+            const user1_point = {
+                bias: user1_slope.mul(WEEK.mul(104)),
+                slope: user1_slope,
+                endTimestamp: current_ts.add(WEEK.mul(85)),
+                blockNumber: current_block - 500,
+            }
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts,
+                user1_point
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(4)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+
+            await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
+
+            await controller.connect(user1).approveProxyManager(manager.address)
+
+        });
+
+        it(' should set the vote correctly for the user via proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            const vote_power = 4000
+
+            const previous_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_total_point = await controller.pointsWeightTotal(next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+            const user_prev_free_power = await controller.usedFreePower(user1.address)
+            const user_prev_used_proxy_power = (await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower
+
+            const user_point = await power.getUserPointAt(user1.address, current_ts)
+
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+
+            const tx = await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, vote_power)
+            const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
+            const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.add(vote_power))
+            expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_free_power)
+            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
+
+            const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const new_total_point = await controller.pointsWeightTotal(next_period)
+
+            expect(new_gauge_point.bias).to.be.eq(previous_gauge_point.bias.add(expected_vote_bias))
+            expect(new_gauge_point.slope).to.be.eq(previous_gauge_point.slope.add(expected_vote_slope))
+
+            expect(new_total_point.bias).to.be.eq(previous_total_point.bias.add(expected_vote_bias))
+            expect(new_total_point.slope).to.be.eq(previous_total_point.slope.add(expected_vote_slope))
+
+            expect(await controller.changesWeight(gauge1.address, user_point.endTimestamp)).to.be.eq(previous_gauge_change.add(expected_vote_slope))
+            expect(await controller.changesWeightTotal(user_point.endTimestamp)).to.be.eq(previous_total_change.add(expected_vote_slope))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts)
+
+            expect(await controller.timeTotal()).to.be.eq(next_period)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(expected_vote_slope)
+            expect(last_user_vote_slope.power).to.be.eq(vote_power)
+            expect(last_user_vote_slope.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope.caller).to.be.eq(proxyVoter1.address)
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge1.address,
+                vote_power
+            )
+
+        });
+
+        it(' should fail if trying to use more than allowed for the proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, 7500)
+            ).to.be.revertedWith('VotingPowerProxyExceeded')
+
+        });
+
+        it(' should fail if trying to allocate more than max proxy power', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, 3500)
+            
+            await expect(
+                controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
+            ).to.be.revertedWith('VotingPowerProxyExceeded')
+
+        });
+
+        it(' should fail if trying to caller is not an allowed proxy', async () => {
+            
+            await expect(
+                controller.connect(proxyVoter2).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
+            ).to.be.revertedWith('NotAllowedManager')
+
+        });
+
+        it(' should fail if the proxy is expired', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await advanceTime(WEEK.mul(7).toNumber())
+            
+            await expect(
+                controller.connect(proxyVoter2).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
+            ).to.be.revertedWith('NotAllowedManager')
+
+        });
+
+        it(' should override a past user over to use for proxy', async () => {
+
+            let past_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            past_ts = past_ts.div(WEEK).mul(WEEK)
+
+            const vote_power = 4000
+
+            await controller.connect(user1).voteForManyGaugeWeights([gauge1.address, gauge3.address], [vote_power, 6000])
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, past_ts.add(proxy_duration))
+
+            await advanceTime(WEEK.mul(2).toNumber())
+
+            await controller.connect(user1).updateGaugeWeight(gauge1.address)
+            await controller.connect(user1).updateTotalWeight()
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            const user_point = await power.getUserPointAt(user1.address, current_ts)
+
+            const previous_gauge_point1 = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+            const user_prev_free_power = await controller.usedFreePower(user1.address)
+            const user_prev_used_proxy_power = (await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower
+
+            const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
+
+            const tx1 = await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, 0)
+            const tx_ts1 = BigNumber.from((await provider.getBlock(tx1.blockNumber || 0)).timestamp)
+
+            const tx2 = await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge2.address, vote_power)
+            const tx_ts2 = BigNumber.from((await provider.getBlock(tx2.blockNumber || 0)).timestamp)
+
+            const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
+            const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power)
+            expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_free_power.sub(vote_power))
+            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
+
+            const new_gauge_point1 = await controller.pointsWeight(gauge1.address, next_period)
+            const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+
+            expect(new_gauge_point1.bias).to.be.eq(previous_gauge_point1.bias.sub(expected_prev_bias))
+            expect(new_gauge_point1.slope).to.be.eq(previous_gauge_point1.slope.sub(prev_user_voted_slope.slope))
+
+            expect(new_gauge_point2.bias).to.be.eq(previous_gauge_point2.bias.add(expected_vote_bias))
+            expect(new_gauge_point2.slope).to.be.eq(previous_gauge_point2.slope.add(expected_vote_slope))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts1)
+            expect(await controller.lastUserVote(user1.address, gauge2.address)).to.be.eq(tx_ts2)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const last_user_vote_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(0)
+            expect(last_user_vote_slope.power).to.be.eq(0)
+            expect(last_user_vote_slope.end).to.be.eq(prev_user_voted_slope.end)
+            expect(last_user_vote_slope.caller).to.be.eq(proxyVoter1.address)
+
+            expect(last_user_vote_slope2.slope).to.be.eq(expected_vote_slope)
+            expect(last_user_vote_slope2.power).to.be.eq(vote_power)
+            expect(last_user_vote_slope2.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope2.caller).to.be.eq(proxyVoter1.address)
+            
+            expect(tx1).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts1,
+                user1.address,
+                gauge1.address,
+                0
+            )
+
+            expect(tx2).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts2,
+                user1.address,
+                gauge2.address,
+                vote_power
+            )
+
+        });
+
+        it(' should allow the user to override the past proxy vote after the proxy expired', async () => {
+
+            let past_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            past_ts = past_ts.div(WEEK).mul(WEEK)
+
+            const vote_power = 4000
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, vote_power, past_ts.add(proxy_duration))
+
+            await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, vote_power)
+
+            await advanceTime(WEEK.mul(4).toNumber())
+
+            await controller.connect(user1).updateGaugeWeight(gauge1.address)
+            await controller.connect(user1).updateTotalWeight()
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            const previous_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_total_point = await controller.pointsWeightTotal(next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+
+            const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
+
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)
+            const previous_total_change = await controller.changesWeightTotal(prev_user_voted_slope.end)
+
+            const tx = await controller.connect(user1).voteForGaugeWeights(gauge1.address, 0)
+            const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.sub(vote_power))
+            expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_used_power.sub(vote_power))
+
+            expect(await controller.blockedProxyPower(user1.address)).to.be.eq(0)
+
+            const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const new_total_point = await controller.pointsWeightTotal(next_period)
+
+            expect(new_gauge_point.bias).to.be.eq(previous_gauge_point.bias.sub(expected_prev_bias))
+            expect(new_gauge_point.slope).to.be.eq(previous_gauge_point.slope.sub(prev_user_voted_slope.slope))
+
+            expect(new_total_point.bias).to.be.eq(previous_total_point.bias.sub(expected_prev_bias))
+            expect(new_total_point.slope).to.be.eq(previous_total_point.slope.sub(prev_user_voted_slope.slope))
+
+            expect(await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)).to.be.eq(previous_gauge_change.sub(prev_user_voted_slope.slope))
+            expect(await controller.changesWeightTotal(prev_user_voted_slope.end)).to.be.eq(previous_total_change.sub(prev_user_voted_slope.slope))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts)
+
+            expect(await controller.timeTotal()).to.be.eq(next_period)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(0)
+            expect(last_user_vote_slope.power).to.be.eq(0)
+            expect(last_user_vote_slope.end).to.be.eq(prev_user_voted_slope.end)
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge1.address,
+                0
+            )
+
+        });
+
+        it(' should not allow a proxy or the user to override another proxy vote', async () => {
+
+            let past_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            past_ts = past_ts.div(WEEK).mul(WEEK)
+
+            const vote_power = 3000
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, vote_power, past_ts.add(proxy_duration))
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, 4000, past_ts.add(proxy_duration))
+
+            await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, vote_power)
+
+            await advanceTime(WEEK.mul(2).toNumber())
+
+            await expect(
+                controller.connect(user1).voteForGaugeWeights(gauge1.address, 0)
+            ).to.be.revertedWith('NotAllowedVoteChange')
+
+            await expect(
+                controller.connect(proxyVoter2).voteForGaugeWeightsFor(user1.address, gauge1.address, 0)
+            ).to.be.revertedWith('NotAllowedVoteChange')
+
+        });
+
+        it(' should not allow the user to vote with voting power allocated to a proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+            
+            await expect(
+                controller.connect(user1).voteForManyGaugeWeights([gauge1.address, gauge3.address], [4000, 6000])
+            ).to.be.revertedWith('VotingPowerExceeded')
+
+        });
+    
+    });
+
+    describe('voteForManyGaugeWeightsFor', async () => {
+
+        let board1_id: BigNumber
+        let board2_id: BigNumber
+
+        const gauge2_cap = ethers.utils.parseEther("0.15")
+
+        const proxy_duration = WEEK.mul(4)
+
+        const proxy_power = 5500
+
+        beforeEach(async () => {
+
+            board1_id = await controller.nextBoardId()
+            board2_id = board1_id.add(1)
+
+            await controller.connect(admin).addNewBoard(
+                board1.address,
+                distributor1.address,
+            )
+            await controller.connect(admin).addNewBoard(
+                board2.address,
+                distributor2.address,
+            )
+
+            await controller.connect(admin).addNewGauge(
+                gauge1.address,
+                board1_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge2.address,
+                board1_id,
+                gauge2_cap
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge3.address,
+                board2_id,
+                0
+            )
+            await controller.connect(admin).addNewGauge(
+                gauge4.address,
+                board2_id,
+                0
+            )
+
+            const current_block = (await provider.getBlock('latest')).number
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            const user1_slope = ethers.utils.parseEther("2500").div(WEEK.mul(104))
+
+            const user1_point = {
+                bias: user1_slope.mul(WEEK.mul(104)),
+                slope: user1_slope,
+                endTimestamp: current_ts.add(WEEK.mul(85)),
+                blockNumber: current_block - 500,
+            }
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts,
+                user1_point
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(2)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+
+            await power.connect(admin).setUserPointAt(
+                user1.address, 
+                current_ts.add(WEEK.mul(4)),
+                {
+                    bias: user1_slope.mul(WEEK.mul(104)),
+                    slope: user1_slope,
+                    endTimestamp: current_ts.add(WEEK.mul(85)),
+                    blockNumber: current_block - 500,
+                }
+            )
+
+            await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
+
+            await controller.connect(user1).approveProxyManager(manager.address)
+
+        });
+
+        it(' should allocate the proxy votes correctly', async () => {
+
+            const vote_power = 3000
+            const vote_power2 = 1500
+            const vote_power3 = 2500
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 7000, current_ts.add(proxy_duration))
+
+            const previous_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const previous_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const previous_total_point = await controller.pointsWeightTotal(next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+
+            const user_point = await power.getUserPointAt(user1.address, current_ts)
+
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
+            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, user_point.endTimestamp)
+            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+
+            const tx = await controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
+                user1.address,
+                [gauge1.address, gauge2.address, gauge3.address],
+                [vote_power, vote_power2, vote_power3]
+            )
+            const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
+            const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_slope2 = user_point.slope.mul(vote_power2).div(10000)
+            const expected_vote_bias2 = expected_vote_slope2.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_slope3 = user_point.slope.mul(vote_power3).div(10000)
+            const expected_vote_bias3 = expected_vote_slope3.mul(user_point.endTimestamp.sub(next_period))
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.add(
+                vote_power + vote_power2 + vote_power3
+            ))
+
+            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(
+                vote_power + vote_power2 + vote_power3
+            )
+
+            const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const new_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const new_total_point = await controller.pointsWeightTotal(next_period)
+
+            expect(new_gauge_point.bias).to.be.eq(previous_gauge_point.bias.add(expected_vote_bias))
+            expect(new_gauge_point.slope).to.be.eq(previous_gauge_point.slope.add(expected_vote_slope))
+            expect(new_gauge_point2.bias).to.be.eq(previous_gauge_point2.bias.add(expected_vote_bias2))
+            expect(new_gauge_point2.slope).to.be.eq(previous_gauge_point2.slope.add(expected_vote_slope2))
+            expect(new_gauge_point3.bias).to.be.eq(previous_gauge_point3.bias.add(expected_vote_bias3))
+            expect(new_gauge_point3.slope).to.be.eq(previous_gauge_point3.slope.add(expected_vote_slope3))
+
+            expect(new_total_point.bias).to.be.eq(previous_total_point.bias.add(
+                expected_vote_bias.add(expected_vote_bias2).add(expected_vote_bias3)
+            ))
+            expect(new_total_point.slope).to.be.eq(previous_total_point.slope.add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3)
+            ))
+
+            expect(await controller.changesWeight(gauge1.address, user_point.endTimestamp)).to.be.eq(previous_gauge_change.add(expected_vote_slope))
+            expect(await controller.changesWeight(gauge2.address, user_point.endTimestamp)).to.be.eq(previous_gauge_change2.add(expected_vote_slope2))
+            expect(await controller.changesWeight(gauge3.address, user_point.endTimestamp)).to.be.eq(previous_gauge_change3.add(expected_vote_slope3))
+            expect(await controller.changesWeightTotal(user_point.endTimestamp)).to.be.eq(previous_total_change.add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3)
+            ))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts)
+
+            expect(await controller.timeTotal()).to.be.eq(next_period)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const last_user_vote_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+            const last_user_vote_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(expected_vote_slope)
+            expect(last_user_vote_slope.power).to.be.eq(vote_power)
+            expect(last_user_vote_slope.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope.caller).to.be.eq(proxyVoter1.address)
+
+            expect(last_user_vote_slope2.slope).to.be.eq(expected_vote_slope2)
+            expect(last_user_vote_slope2.power).to.be.eq(vote_power2)
+            expect(last_user_vote_slope2.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope2.caller).to.be.eq(proxyVoter1.address)
+
+            expect(last_user_vote_slope3.slope).to.be.eq(expected_vote_slope3)
+            expect(last_user_vote_slope3.power).to.be.eq(vote_power3)
+            expect(last_user_vote_slope3.end).to.be.eq(user_point.endTimestamp)
+            expect(last_user_vote_slope3.caller).to.be.eq(proxyVoter1.address)
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge1.address,
+                vote_power
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge2.address,
+                vote_power2
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge3.address,
+                vote_power3
+            )
+
+        });
+
+        it(' should allow to override all past votes from the user for proxy', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const new_vote_power1 = 0
+            const new_vote_power2 = 5500
+            const new_vote_power3 = 1500
+            const new_vote_power4 = 3000
+
+            await controller.connect(user1).voteForManyGaugeWeights(
+                [gauge1.address, gauge2.address, gauge3.address],
+                [vote_power, vote_power2, vote_power3]
+            )
+
+            await advanceTime(WEEK.mul(2).toNumber())
+
+            await controller.connect(user1).updateGaugeWeight(gauge1.address)
+            await controller.connect(user1).updateGaugeWeight(gauge2.address)
+            await controller.connect(user1).updateGaugeWeight(gauge3.address)
+            await controller.connect(user1).updateGaugeWeight(gauge4.address)
+            await controller.connect(user1).updateTotalWeight()
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 10000, current_ts.add(proxy_duration))
+
+            const previous_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const previous_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const previous_gauge_point4 = await controller.pointsWeight(gauge4.address, next_period)
+            const previous_total_point = await controller.pointsWeightTotal(next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+
+            const user_point = await power.getUserPointAt(user1.address, current_ts)
+
+            const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+            const prev_user_voted_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
+            const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
+            const expected_prev_bias2 = prev_user_voted_slope2.slope.mul(prev_user_voted_slope2.end.sub(next_period))
+            const expected_prev_bias3 = prev_user_voted_slope3.slope.mul(prev_user_voted_slope3.end.sub(next_period))
+
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)
+            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, prev_user_voted_slope.end)
+            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, prev_user_voted_slope.end)
+            const previous_gauge_change4 = await controller.changesWeight(gauge4.address, prev_user_voted_slope.end)
+            const previous_total_change = await controller.changesWeightTotal(prev_user_voted_slope.end)
+
+            const tx = await controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
+                user1.address,
+                [gauge1.address, gauge2.address, gauge3.address, gauge4.address],
+                [new_vote_power1, new_vote_power2, new_vote_power3, new_vote_power4]
+            )
+            const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const expected_vote_slope = BigNumber.from(0)
+            const expected_vote_slope2 = user_point.slope.mul(new_vote_power2).div(10000)
+            const expected_vote_slope3 = user_point.slope.mul(new_vote_power3).div(10000)
+            const expected_vote_slope4 = user_point.slope.mul(new_vote_power4).div(10000)
+            const expected_vote_bias = BigNumber.from(0)
+            const expected_vote_bias2 = expected_vote_slope2.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_bias3 = expected_vote_slope3.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_bias4 = expected_vote_slope4.mul(user_point.endTimestamp.sub(next_period))
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.sub(
+                vote_power + vote_power2 + vote_power3
+            ).add(
+                new_vote_power2 + new_vote_power3 + new_vote_power4
+            ))
+
+            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(new_vote_power2 + new_vote_power3 + new_vote_power4)
+
+            const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const new_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const new_gauge_point4 = await controller.pointsWeight(gauge4.address, next_period)
+            const new_total_point = await controller.pointsWeightTotal(next_period)
+
+            expect(new_gauge_point.bias).to.be.eq(previous_gauge_point.bias.sub(expected_prev_bias).add(expected_vote_bias))
+            expect(new_gauge_point2.bias).to.be.eq(previous_gauge_point2.bias.sub(expected_prev_bias2).add(expected_vote_bias2))
+            expect(new_gauge_point3.bias).to.be.eq(previous_gauge_point3.bias.sub(expected_prev_bias3).add(expected_vote_bias3))
+            expect(new_gauge_point4.bias).to.be.eq(previous_gauge_point4.bias.add(expected_vote_bias4))
+            expect(new_gauge_point.slope).to.be.eq(previous_gauge_point.slope.sub(prev_user_voted_slope.slope).add(expected_vote_slope))
+
+            expect(new_total_point.bias).to.be.eq(previous_total_point.bias.sub(
+                expected_prev_bias.add(expected_prev_bias2).add(expected_prev_bias3)
+            ).add(
+                expected_vote_bias.add(expected_vote_bias2).add(expected_vote_bias3).add(expected_vote_bias4)
+            ))
+            expect(new_total_point.slope).to.be.eq(previous_total_point.slope.sub(
+                prev_user_voted_slope.slope.add(prev_user_voted_slope2.slope).add(prev_user_voted_slope3.slope)
+            ).add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3).add(expected_vote_slope4)
+            ))
+
+            expect(await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)).to.be.eq(previous_gauge_change.sub(prev_user_voted_slope.slope).add(expected_vote_slope))
+            expect(await controller.changesWeight(gauge2.address, prev_user_voted_slope2.end)).to.be.eq(previous_gauge_change2.sub(prev_user_voted_slope2.slope).add(expected_vote_slope2))
+            expect(await controller.changesWeight(gauge3.address, prev_user_voted_slope3.end)).to.be.eq(previous_gauge_change3.sub(prev_user_voted_slope3.slope).add(expected_vote_slope3))
+            expect(await controller.changesWeight(gauge4.address, prev_user_voted_slope.end)).to.be.eq(previous_gauge_change4.add(expected_vote_slope4))
+            expect(await controller.changesWeightTotal(prev_user_voted_slope.end)).to.be.eq(previous_total_change.sub(
+                prev_user_voted_slope.slope.add(prev_user_voted_slope2.slope).add(prev_user_voted_slope3.slope)
+            ).add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3).add(expected_vote_slope4)
+            ))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge2.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge3.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge4.address)).to.be.eq(tx_ts)
+
+            expect(await controller.timeTotal()).to.be.eq(next_period)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(expected_vote_slope)
+            expect(last_user_vote_slope.power).to.be.eq(0)
+            expect(last_user_vote_slope.end).to.be.eq(prev_user_voted_slope.end)
+            expect(last_user_vote_slope.caller).to.be.eq(proxyVoter1.address)
+
+            const last_user_vote_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+
+            expect(last_user_vote_slope2.slope).to.be.eq(expected_vote_slope2)
+            expect(last_user_vote_slope2.power).to.be.eq(new_vote_power2)
+            expect(last_user_vote_slope2.end).to.be.eq(prev_user_voted_slope2.end)
+            expect(last_user_vote_slope2.caller).to.be.eq(proxyVoter1.address)
+
+            const last_user_vote_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
+
+            expect(last_user_vote_slope3.slope).to.be.eq(expected_vote_slope3)
+            expect(last_user_vote_slope3.power).to.be.eq(new_vote_power3)
+            expect(last_user_vote_slope3.end).to.be.eq(prev_user_voted_slope3.end)
+            expect(last_user_vote_slope3.caller).to.be.eq(proxyVoter1.address)
+
+            const last_user_vote_slope4 = await controller.voteUserSlopes(user1.address, gauge4.address)
+
+            expect(last_user_vote_slope4.slope).to.be.eq(expected_vote_slope4)
+            expect(last_user_vote_slope4.power).to.be.eq(new_vote_power4)
+            expect(last_user_vote_slope4.end).to.be.eq(prev_user_voted_slope.end)
+            expect(last_user_vote_slope4.caller).to.be.eq(proxyVoter1.address)
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge1.address,
+                0
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge2.address,
+                new_vote_power2
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge3.address,
+                new_vote_power3
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge4.address,
+                new_vote_power4
+            )
+
+        });
+
+        it(' should allow to override the votes from the proxy after it is expired', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const new_vote_power1 = 0
+            const new_vote_power2 = 5500
+            const new_vote_power3 = 1500
+            const new_vote_power4 = 3000
+
+            let past_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            past_ts = past_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, 10000, past_ts.add(WEEK.mul(2)))
+
+            await controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
+                user1.address,
+                [gauge1.address, gauge2.address, gauge3.address],
+                [vote_power, vote_power2, vote_power3]
+            )
+
+            await advanceTime(WEEK.mul(2).toNumber())
+
+            await controller.connect(user1).updateGaugeWeight(gauge1.address)
+            await controller.connect(user1).updateGaugeWeight(gauge2.address)
+            await controller.connect(user1).updateGaugeWeight(gauge3.address)
+            await controller.connect(user1).updateGaugeWeight(gauge4.address)
+            await controller.connect(user1).updateTotalWeight()
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+            const next_period = current_ts.add(WEEK)
+
+            const previous_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const previous_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const previous_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const previous_gauge_point4 = await controller.pointsWeight(gauge4.address, next_period)
+            const previous_total_point = await controller.pointsWeightTotal(next_period)
+
+            const user_prev_used_power = await controller.voteUserPower(user1.address)
+
+            const user_point = await power.getUserPointAt(user1.address, current_ts)
+
+            const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+            const prev_user_voted_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
+            const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
+            const expected_prev_bias2 = prev_user_voted_slope2.slope.mul(prev_user_voted_slope2.end.sub(next_period))
+            const expected_prev_bias3 = prev_user_voted_slope3.slope.mul(prev_user_voted_slope3.end.sub(next_period))
+
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)
+            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, prev_user_voted_slope.end)
+            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, prev_user_voted_slope.end)
+            const previous_gauge_change4 = await controller.changesWeight(gauge4.address, prev_user_voted_slope.end)
+            const previous_total_change = await controller.changesWeightTotal(prev_user_voted_slope.end)
+
+            const tx = await controller.connect(user1).voteForManyGaugeWeights(
+                [gauge1.address, gauge2.address, gauge3.address, gauge4.address],
+                [new_vote_power1, new_vote_power2, new_vote_power3, new_vote_power4]
+            )
+            const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const expected_vote_slope = BigNumber.from(0)
+            const expected_vote_slope2 = user_point.slope.mul(new_vote_power2).div(10000)
+            const expected_vote_slope3 = user_point.slope.mul(new_vote_power3).div(10000)
+            const expected_vote_slope4 = user_point.slope.mul(new_vote_power4).div(10000)
+            const expected_vote_bias = BigNumber.from(0)
+            const expected_vote_bias2 = expected_vote_slope2.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_bias3 = expected_vote_slope3.mul(user_point.endTimestamp.sub(next_period))
+            const expected_vote_bias4 = expected_vote_slope4.mul(user_point.endTimestamp.sub(next_period))
+
+            expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.sub(
+                vote_power + vote_power2 + vote_power3
+            ).add(
+                new_vote_power2 + new_vote_power3 + new_vote_power4
+            ))
+
+            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(0)
+
+            const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
+            const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
+            const new_gauge_point3 = await controller.pointsWeight(gauge3.address, next_period)
+            const new_gauge_point4 = await controller.pointsWeight(gauge4.address, next_period)
+            const new_total_point = await controller.pointsWeightTotal(next_period)
+
+            expect(new_gauge_point.bias).to.be.eq(previous_gauge_point.bias.sub(expected_prev_bias).add(expected_vote_bias))
+            expect(new_gauge_point2.bias).to.be.eq(previous_gauge_point2.bias.sub(expected_prev_bias2).add(expected_vote_bias2))
+            expect(new_gauge_point3.bias).to.be.eq(previous_gauge_point3.bias.sub(expected_prev_bias3).add(expected_vote_bias3))
+            expect(new_gauge_point4.bias).to.be.eq(previous_gauge_point4.bias.add(expected_vote_bias4))
+            expect(new_gauge_point.slope).to.be.eq(previous_gauge_point.slope.sub(prev_user_voted_slope.slope).add(expected_vote_slope))
+
+            expect(new_total_point.bias).to.be.eq(previous_total_point.bias.sub(
+                expected_prev_bias.add(expected_prev_bias2).add(expected_prev_bias3)
+            ).add(
+                expected_vote_bias.add(expected_vote_bias2).add(expected_vote_bias3).add(expected_vote_bias4)
+            ))
+            expect(new_total_point.slope).to.be.eq(previous_total_point.slope.sub(
+                prev_user_voted_slope.slope.add(prev_user_voted_slope2.slope).add(prev_user_voted_slope3.slope)
+            ).add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3).add(expected_vote_slope4)
+            ))
+
+            expect(await controller.changesWeight(gauge1.address, prev_user_voted_slope.end)).to.be.eq(previous_gauge_change.sub(prev_user_voted_slope.slope).add(expected_vote_slope))
+            expect(await controller.changesWeight(gauge2.address, prev_user_voted_slope2.end)).to.be.eq(previous_gauge_change2.sub(prev_user_voted_slope2.slope).add(expected_vote_slope2))
+            expect(await controller.changesWeight(gauge3.address, prev_user_voted_slope3.end)).to.be.eq(previous_gauge_change3.sub(prev_user_voted_slope3.slope).add(expected_vote_slope3))
+            expect(await controller.changesWeight(gauge4.address, prev_user_voted_slope.end)).to.be.eq(previous_gauge_change4.add(expected_vote_slope4))
+            expect(await controller.changesWeightTotal(prev_user_voted_slope.end)).to.be.eq(previous_total_change.sub(
+                prev_user_voted_slope.slope.add(prev_user_voted_slope2.slope).add(prev_user_voted_slope3.slope)
+            ).add(
+                expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3).add(expected_vote_slope4)
+            ))
+
+            expect(await controller.lastUserVote(user1.address, gauge1.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge2.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge3.address)).to.be.eq(tx_ts)
+            expect(await controller.lastUserVote(user1.address, gauge4.address)).to.be.eq(tx_ts)
+
+            expect(await controller.timeTotal()).to.be.eq(next_period)
+
+            const last_user_vote_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
+
+            expect(last_user_vote_slope.slope).to.be.eq(expected_vote_slope)
+            expect(last_user_vote_slope.power).to.be.eq(0)
+            expect(last_user_vote_slope.end).to.be.eq(prev_user_voted_slope.end)
+            expect(last_user_vote_slope.caller).to.be.eq(user1.address)
+
+            const last_user_vote_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
+
+            expect(last_user_vote_slope2.slope).to.be.eq(expected_vote_slope2)
+            expect(last_user_vote_slope2.power).to.be.eq(new_vote_power2)
+            expect(last_user_vote_slope2.end).to.be.eq(prev_user_voted_slope2.end)
+            expect(last_user_vote_slope2.caller).to.be.eq(user1.address)
+
+            const last_user_vote_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
+
+            expect(last_user_vote_slope3.slope).to.be.eq(expected_vote_slope3)
+            expect(last_user_vote_slope3.power).to.be.eq(new_vote_power3)
+            expect(last_user_vote_slope3.end).to.be.eq(prev_user_voted_slope3.end)
+            expect(last_user_vote_slope3.caller).to.be.eq(user1.address)
+
+            const last_user_vote_slope4 = await controller.voteUserSlopes(user1.address, gauge4.address)
+
+            expect(last_user_vote_slope4.slope).to.be.eq(expected_vote_slope4)
+            expect(last_user_vote_slope4.power).to.be.eq(new_vote_power4)
+            expect(last_user_vote_slope4.end).to.be.eq(prev_user_voted_slope.end)
+            expect(last_user_vote_slope4.caller).to.be.eq(user1.address)
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge1.address,
+                0
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge2.address,
+                new_vote_power2
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge3.address,
+                new_vote_power3
+            )
+            
+            expect(tx).to.emit(controller, "VoteForGauge").withArgs(
+                tx_ts,
+                user1.address,
+                gauge4.address,
+                new_vote_power4
+            )
+
+        });
+
+        it(' should fail if trying to use more than allowed for the proxy', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [5000, 4500])
+            ).to.be.revertedWith('VotingPowerProxyExceeded')
+
+        });
+
+        it(' should fail if trying to caller is not an allowed proxy', async () => {
+            
+            await expect(
+                controller.connect(proxyVoter2).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [2000, 2500])
+            ).to.be.revertedWith('NotAllowedManager')
+
+        });
+
+        it(' should fail if the proxy is expired', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await advanceTime(WEEK.mul(7).toNumber())
+            
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [2000, 2500])
+            ).to.be.revertedWith('ExpiredProxy')
+
+        });
+
+        it(' should fail if the list are not the same length', async () => {
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [2000])
+            ).to.be.revertedWith('ArraySizeMismatch')
+
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address], [2000, 2500])
+            ).to.be.revertedWith('ArraySizeMismatch')
 
         });
     

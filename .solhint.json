@@ -2,7 +2,7 @@
   "extends": "solhint:default",
   "rules": {
     "max-line-length": ["off",120],
-    "max-states-count": ["warn",20],
+    "max-states-count": ["warn",25],
     "no-empty-blocks": "warn",
     "no-unused-vars": "warn",
     "payable-fallback": "warn",

@@ -41,9 +41,15 @@ library Errors {
     error LockExpired();
     error VotingPowerInvalid();
     error VotingPowerExceeded();
+    error VotingPowerProxyExceeded();
     error VotingCooldown();
     error KilledGauge();
     error NotKilledGauge();
+    error NotAllowedManager();
+    error ExpiredProxy();
+    error ProxyAlreadyActive();
+    error ProxyPowerExceeded();
+    error NotAllowedVoteChange();
 
     // Loot
     error CreatorAlreadySet();
