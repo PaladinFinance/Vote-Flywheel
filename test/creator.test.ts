@@ -775,13 +775,10 @@ describe('LootCreator contract tests', () => {
             const gauge_pal_amount = period_budget.palAmount.mul(gauge_weight).div(UNIT)
             const gauge_extra_amount = period_budget.extraAmount.mul(gauge_weight).div(UNIT)
 
-            const gauge_pal_per_vote = gauge_pal_amount.mul(UNIT).div(total_rewards).mul(UNIT).div(MAX_MULTIPLIER)
-            const gauge_extra_per_vote = gauge_extra_amount.mul(UNIT).div(total_rewards).mul(UNIT).div(MAX_MULTIPLIER)
+            const gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
-            const gauge_allocation = await creator.gaugeAllocationPerPeriod(questGauge1.address, period)
-
-            expect(gauge_allocation.palPerVote).to.be.eq(gauge_pal_per_vote)
-            expect(gauge_allocation.extraPerVote).to.be.eq(gauge_extra_per_vote)
+            expect(gauge_budget.palAmount).to.be.eq(gauge_pal_amount)
+            expect(gauge_budget.extraAmount).to.be.eq(gauge_extra_amount)
 
             const new_period_allocated = await creator.allocatedBudgetHistory(period)
 
@@ -831,13 +828,10 @@ describe('LootCreator contract tests', () => {
             const gauge_pal_amount = period_budget.palAmount.mul(gauge_cap).div(UNIT)
             const gauge_extra_amount = period_budget.extraAmount.mul(gauge_cap).div(UNIT)
 
-            const gauge_pal_per_vote = gauge_pal_amount.mul(UNIT).div(total_rewards).mul(UNIT).div(MAX_MULTIPLIER)
-            const gauge_extra_per_vote = gauge_extra_amount.mul(UNIT).div(total_rewards).mul(UNIT).div(MAX_MULTIPLIER)
+            const gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
-            const gauge_allocation = await creator.gaugeAllocationPerPeriod(questGauge1.address, period)
-
-            expect(gauge_allocation.palPerVote).to.be.eq(gauge_pal_per_vote)
-            expect(gauge_allocation.extraPerVote).to.be.eq(gauge_extra_per_vote)
+            expect(gauge_budget.palAmount).to.be.eq(gauge_pal_amount)
+            expect(gauge_budget.extraAmount).to.be.eq(gauge_extra_amount)
 
             const new_period_allocated = await creator.allocatedBudgetHistory(period)
 
@@ -877,7 +871,7 @@ describe('LootCreator contract tests', () => {
             )
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(period)
-            const prev_gauge_allocation = await creator.gaugeAllocationPerPeriod(questGauge1.address, period)
+            const prev_gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
             await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
                 creator.address,
@@ -886,7 +880,7 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            expect(await creator.gaugeAllocationPerPeriod(questGauge1.address, period)).to.be.deep.eq(prev_gauge_allocation)
+            expect(await creator.gaugeBudgetPerPeriod(questGauge1.address, period)).to.be.deep.eq(prev_gauge_budget)
             expect(await creator.allocatedBudgetHistory(period)).to.be.deep.eq(prev_period_allocated)
 
         });
@@ -894,7 +888,7 @@ describe('LootCreator contract tests', () => {
         it(' should not allocate if the gauge is not listed', async () => {
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(period)
-            const prev_gauge_allocation = await creator.gaugeAllocationPerPeriod(questGauge1.address, period)
+            const prev_gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
             await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
                 creator.address,
@@ -903,11 +897,11 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            expect(await creator.gaugeAllocationPerPeriod(questGauge1.address, period)).to.be.deep.eq(prev_gauge_allocation)
+            expect(await creator.gaugeBudgetPerPeriod(questGauge1.address, period)).to.be.deep.eq(prev_gauge_budget)
             expect(await creator.allocatedBudgetHistory(period)).to.be.deep.eq(prev_period_allocated)
 
-            expect((await creator.gaugeAllocationPerPeriod(questGauge1.address, period)).palPerVote).to.be.eq(0)
-            expect((await creator.gaugeAllocationPerPeriod(questGauge1.address, period)).extraPerVote).to.be.eq(0)
+            expect((await creator.gaugeBudgetPerPeriod(questGauge1.address, period)).palAmount).to.be.eq(0)
+            expect((await creator.gaugeBudgetPerPeriod(questGauge1.address, period)).extraAmount).to.be.eq(0)
 
         });
 
@@ -985,23 +979,33 @@ describe('LootCreator contract tests', () => {
 
         it(' should return the full gauge allocation if there is only 1 Quest on the gauge', async () => {
 
-            const gauge_allocation = await creator.getGaugeAllocationForPeriod(questGauge2.address, period)
+            const gauge_budget = await creator.getGaugeBudgetForPeriod(questGauge2.address, period)
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id3, distributor.address, period)
 
-            expect(quest_allocation.palPerVote).to.be.eq(gauge_allocation.palPerVote)
-            expect(quest_allocation.extraPerVote).to.be.eq(gauge_allocation.extraPerVote)
+            const quest_total_rewards_period = await creator.totalQuestPeriodRewards(quest_id3, period)
+
+            const pal_per_vote = gauge_budget.palAmount.mul(UNIT).div(quest_total_rewards_period).mul(UNIT).div(MAX_MULTIPLIER)
+            const extra_per_vote = gauge_budget.extraAmount.mul(UNIT).div(quest_total_rewards_period).mul(UNIT).div(MAX_MULTIPLIER)
+
+            expect(quest_allocation.palPerVote).to.be.eq(pal_per_vote)
+            expect(quest_allocation.extraPerVote).to.be.eq(extra_per_vote)
             
         });
 
         it(' should split the gauge allocation if there is multiple Quests on the gauge', async () => {
 
-            const gauge_allocation = await creator.getGaugeAllocationForPeriod(questGauge1.address, period)
+            const gauge_budget = await creator.getGaugeBudgetForPeriod(questGauge1.address, period)
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            expect(quest_allocation.palPerVote).to.be.eq(gauge_allocation.palPerVote.div(2))
-            expect(quest_allocation.extraPerVote).to.be.eq(gauge_allocation.extraPerVote.div(2))
+            const quest_total_rewards_period = await creator.totalQuestPeriodRewards(quest_id, period)
+
+            const pal_per_vote = gauge_budget.palAmount.div(2).mul(UNIT).div(quest_total_rewards_period).mul(UNIT).div(MAX_MULTIPLIER)
+            const extra_per_vote = gauge_budget.extraAmount.div(2).mul(UNIT).div(quest_total_rewards_period).mul(UNIT).div(MAX_MULTIPLIER)
+
+            expect(quest_allocation.palPerVote).to.be.eq(pal_per_vote)
+            expect(quest_allocation.extraPerVote).to.be.eq(extra_per_vote)
 
         });
 

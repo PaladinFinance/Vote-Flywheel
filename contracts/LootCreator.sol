@@ -83,7 +83,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     mapping(uint256 => Budget) public periodBudget;
     mapping(uint256 => Budget) public allocatedBudgetHistory;
 
-    mapping(address => mapping(uint256 => Allocation)) public gaugeAllocationPerPeriod;
+    mapping(address => mapping(uint256 => Budget)) public gaugeBudgetPerPeriod;
     mapping(address => mapping(uint256 => bool)) public isGaugeAllocatedForPeriod;
 
     mapping(uint256 => uint256) public periodBlockCheckpoint;
@@ -149,13 +149,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         extraAmount = periodBudget[period].extraAmount;
     }
 
-    function getGaugeAllocationForPeriod(
+    function getGaugeBudgetForPeriod(
         address gauge,
         uint256 period
-    ) external view returns(uint256 palPerVote, uint256 extraPerVote) {
-        Allocation memory allocation = gaugeAllocationPerPeriod[gauge][period];
-        palPerVote = allocation.palPerVote;
-        extraPerVote = allocation.extraPerVote;
+    ) external view returns(uint256 palAmount, uint256 extraAmount) {
+        Budget memory budget = gaugeBudgetPerPeriod[gauge][period];
+        palAmount = budget.palAmount;
+        extraAmount = budget.extraAmount;
     }
 
     function getQuestAllocationForPeriod(
@@ -164,7 +164,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         uint256 period
     ) external view returns(uint256 palPerVote, uint256 extraPerVote) {
         address gauge = _getQuestGauge(questId, distributor);
-        Allocation memory allocation = _getQuestAllocationForPeriod(gauge, distributor, period);
+        Allocation memory allocation = _getQuestAllocationForPeriod(gauge, questId, distributor, period);
         palPerVote = allocation.palPerVote;
         extraPerVote = allocation.extraPerVote;
     }
@@ -200,58 +200,65 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     }
 
     function notifyDistributedQuestPeriod(uint256 questId, uint256 period, uint256 totalRewards) external onlyAllowedDistributor nonReentrant {
+        // Pull any new budget & update the current period to have an up to date budget
         _pullBudget();
         _updatePeriod();
         
+        // Fetch the gauge for the quest & check if it's listed
         address gauge = _getQuestGauge(questId, msg.sender);
         if(!ILootVoteController(lootVoteController).isListedGauge(gauge)) return;
 
+        // If not set yet, set the total rewards for the quest & period
         if(!totalQuestPeriodSet[questId][period]) {
             totalQuestPeriodRewards[questId][period] = totalRewards;
             totalQuestPeriodSet[questId][period] = true;
         }
 
+        // If the period is already allocated for the gauge, return
         if(isGaugeAllocatedForPeriod[gauge][period]) return;
         isGaugeAllocatedForPeriod[gauge][period] = true;
 
+        // Fetch the gauge weight & cap
         uint256 gaugeWeight = ILootVoteController(lootVoteController).getGaugeRelativeWeightWrite(gauge, period);
         uint256 gaugeCap = ILootVoteController(lootVoteController).getGaugeCap(gauge);
 
+        // Load the budget for the period
         Budget memory budget = periodBudget[period];
 
+        // If the gauge weight is higher than the cap, we need to handle the un-allocated rewards
         if(gaugeWeight > gaugeCap) {
             uint256 unsunedWeight = gaugeWeight - gaugeCap;
 
             gaugeWeight = gaugeCap;
 
-            // Handle un-allocated
+            // Handle un-allocated budget => set it as pending for next periods
             pengingBudget.palAmount += uint128(uint256(budget.palAmount) * unsunedWeight / UNIT);
             pengingBudget.extraAmount += uint128(uint256(budget.extraAmount) * unsunedWeight / UNIT);
         }
 
+        // Calculate the allocated budget for the gauge
         uint256 palAmount = uint256(budget.palAmount) * gaugeWeight / UNIT;
         uint256 extraAmount = uint256(budget.extraAmount) * gaugeWeight / UNIT;
 
+        // Update the allocated budget history
         allocatedBudgetHistory[period].palAmount += uint128(palAmount);
         allocatedBudgetHistory[period].extraAmount += uint128(extraAmount);
 
-        uint256 palPerVote = (((palAmount * UNIT) / totalRewards) * UNIT) / MAX_MULTIPLIER;
-        uint256 extraPerVote = (((extraAmount * UNIT) / totalRewards) * UNIT) / MAX_MULTIPLIER;
-
-        Allocation memory allocation = Allocation(
-            uint128(palPerVote),
-            uint128(extraPerVote)
+        // Save the Budget for the gauge for the period
+        gaugeBudgetPerPeriod[gauge][period] = Budget(
+            uint128(palAmount),
+            uint128(extraAmount)
         );
-
-        gaugeAllocationPerPeriod[gauge][period] = allocation;
 
     }
 
 	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot nonReentrant {
+        // Add undistributed rewards from Loot to the pending budget
         pengingBudget.palAmount += uint128(palAmount);
     }
 
 	function notifyNewBudget(uint256 palAmount, uint256 extraAmount) external onlyGauge {
+        // Update the pending budget with the new budget from the gauge
         pengingBudget.palAmount += uint128(palAmount);
         pengingBudget.extraAmount += uint128(extraAmount);
     }
@@ -279,18 +286,29 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     function _getQuestAllocationForPeriod(
         address gauge,
+        uint256 questId,
         address distributor,
         uint256 period
     ) internal view returns(Allocation memory) {
         address board = MultiMerkleDistributorV2(distributor).questBoard();
         uint256 nbQuestForGauge = IQuestBoard(board).getQuestIdsForPeriodForGauge(gauge, period).length;
+        uint256 questTotalRewards = totalQuestPeriodRewards[questId][period];
 
-        if(nbQuestForGauge == 0) return Allocation(0, 0);
-        if(nbQuestForGauge == 1) return gaugeAllocationPerPeriod[gauge][period];
+        if(nbQuestForGauge == 0 || questTotalRewards == 0) return Allocation(0, 0);
 
-        Allocation memory allocation = gaugeAllocationPerPeriod[gauge][period];
-        allocation.palPerVote = uint128(uint256(allocation.palPerVote) / nbQuestForGauge);
-        allocation.extraPerVote = uint128(uint256(allocation.extraPerVote) / nbQuestForGauge);
+        Allocation memory allocation;
+        // Load the Budget for the gauge for the period
+        Budget memory budget = gaugeBudgetPerPeriod[gauge][period];
+
+        // Calculate the allocation per vote based on the gauge budget 
+        // & total rewards for the Quest & the number of Quests for the gauge
+        if(nbQuestForGauge == 1) {
+            allocation.palPerVote = uint128((((budget.palAmount * UNIT) / questTotalRewards) * UNIT) / MAX_MULTIPLIER);
+            allocation.extraPerVote = uint128((((budget.extraAmount * UNIT) / questTotalRewards) * UNIT) / MAX_MULTIPLIER);
+        } else {
+            allocation.palPerVote = uint128(((((budget.palAmount / nbQuestForGauge) * UNIT) / questTotalRewards) * UNIT) / MAX_MULTIPLIER);
+            allocation.extraPerVote = uint128(((((budget.extraAmount / nbQuestForGauge) * UNIT) / questTotalRewards) * UNIT) / MAX_MULTIPLIER);
+        }
 
         return allocation;
     }
@@ -298,8 +316,10 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     function _updatePeriod() internal {
         if(block.timestamp < nextBudgetUpdatePeriod) return;
 
+        // Save the current block number for checkpointing
         periodBlockCheckpoint[nextBudgetUpdatePeriod] = block.number;
 
+        // Update the current period budget
         Budget memory pending = pengingBudget;
         pengingBudget = Budget(0, 0);
 
@@ -310,6 +330,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
         pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
 
+        // Save the new set budget
         periodBudget[nextBudgetUpdatePeriod] = pending;
 
         nextBudgetUpdatePeriod += WEEK;
@@ -322,17 +343,17 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         vars.gauge = _getQuestGauge(questId, distributor);
         if(!ILootVoteController(lootVoteController).isListedGauge(vars.gauge)) return;
 
-        // get Quest allocation
-        Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, distributor, period);
+        // Get Quest allocation
+        Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, questId, distributor, period);
 
-        // get user boost power and total power
+        // Get user boost power and total power
         vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
         vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
 
         vars.userPeriodRewards = userQuestPeriodRewards[distributor][questId][period][user];
         if(vars.userPeriodRewards == 0) return;
 
-        // calculate ratios based on that
+        // Calculate ratios based on that
         vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
         vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[questId][period];
         if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
@@ -341,7 +362,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         if(vars.userMultiplier < BASE_MULTIPLIER) vars.userMultiplier = BASE_MULTIPLIER; // don't go under the min
         if(vars.userMultiplier > MAX_MULTIPLIER) vars.userMultiplier = MAX_MULTIPLIER; // don't want to go higher than the max
 
-        // calculate user undistributed rewards
+        // Calculate user undistributed rewards
         vars.userPalAmount = ((uint256(allocation.palPerVote) * vars.userMultiplier / UNIT) * vars.userPeriodRewards / UNIT);
         vars.userExtraAmount = ((uint256(allocation.extraPerVote) * vars.userMultiplier / UNIT) * vars.userPeriodRewards / UNIT);
 
@@ -355,7 +376,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
             );
         }
 
-        // create the Loot
+        // Create the Loot
         Loot(loot).createLoot(user, period + WEEK, vars.userPalAmount, vars.userExtraAmount);
 
     }

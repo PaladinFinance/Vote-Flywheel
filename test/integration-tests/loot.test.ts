@@ -473,10 +473,13 @@ describe('Vote Controller - Voting tests', () => {
             const gauge_pal_per_vote = gauge_pal_amount.mul(UNIT).div(rewards_per_period).mul(UNIT).div(MAX_MULTIPLIER)
             const gauge_extra_per_vote = gauge_extra_amount.mul(UNIT).div(rewards_per_period).mul(UNIT).div(MAX_MULTIPLIER)
 
-            const gauge_allocation = await creator.gaugeAllocationPerPeriod(VALID_GAUGES[0].gauge, closed_period)
+            const gauge_budget = await creator.gaugeBudgetPerPeriod(VALID_GAUGES[0].gauge, closed_period)
+            const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id1, distributor1.address, closed_period)
 
-            expect(gauge_allocation.palPerVote).to.be.eq(gauge_pal_per_vote)
-            expect(gauge_allocation.extraPerVote).to.be.eq(gauge_extra_per_vote)
+            expect(gauge_budget.palAmount).to.be.eq(gauge_pal_amount)
+            expect(gauge_budget.extraAmount).to.be.eq(gauge_extra_amount)
+            expect(quest_allocation.palPerVote).to.be.eq(gauge_pal_per_vote)
+            expect(quest_allocation.extraPerVote).to.be.eq(gauge_extra_per_vote)
 
             const gauge_weight2 = await controller["getGaugeRelativeWeight(address,uint256)"](VALID_GAUGES[2].gauge, closed_period)
             const gauge_cap2 = await controller.getGaugeCap(VALID_GAUGES[2].gauge)
@@ -487,10 +490,13 @@ describe('Vote Controller - Voting tests', () => {
             const gauge_pal_per_vote2 = gauge_pal_amount2.mul(UNIT).div(rewards_per_period2).mul(UNIT).div(MAX_MULTIPLIER)
             const gauge_extra_per_vote2 = gauge_extra_amount2.mul(UNIT).div(rewards_per_period2).mul(UNIT).div(MAX_MULTIPLIER)
 
-            const gauge_allocation2 = await creator.gaugeAllocationPerPeriod(VALID_GAUGES[2].gauge, closed_period)
+            const gauge_budget2 = await creator.gaugeBudgetPerPeriod(VALID_GAUGES[2].gauge, closed_period)
+            const quest_allocation2 = await creator.getQuestAllocationForPeriod(quest_id2, distributor2.address, closed_period)
 
-            expect(gauge_allocation2.palPerVote).to.be.eq(gauge_pal_per_vote2)
-            expect(gauge_allocation2.extraPerVote).to.be.eq(gauge_extra_per_vote2)
+            expect(gauge_budget2.palAmount).to.be.eq(gauge_pal_amount2)
+            expect(gauge_budget2.extraAmount).to.be.eq(gauge_extra_amount2)
+            expect(quest_allocation2.palPerVote).to.be.eq(gauge_pal_per_vote2)
+            expect(quest_allocation2.extraPerVote).to.be.eq(gauge_extra_per_vote2)
 
             const new_period_allocated = await creator.allocatedBudgetHistory(closed_period)
 

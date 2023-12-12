@@ -68,13 +68,17 @@ contract LootGauge is Owner, ReentrancyGuard {
     function updateLootBudget() external nonReentrant {
         if(budgetController == address(0)) return;
 
+        // Checkpoint this gauge in the Controller
         IPaladinBudgetController(budgetController).checkpoint(address(this));
 
+        // Get the current budget from the Controller
         (uint256 palBudget, uint256 extraBudget) = IPaladinBudgetController(budgetController).getCurrentBudget(address(this));
         if(palBudget == 0 && extraBudget == 0) return;
 
+        // Send the budget to the LootReserve
         (uint256 palAmount, uint256 extraAmount) = IPaladinBudgetController(budgetController).sendBudget(address(this), lootReserve);
 
+        // Notify the LootCreator of the new budget
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);
     }
 
@@ -82,11 +86,13 @@ contract LootGauge is Owner, ReentrancyGuard {
     // Admin functions
 
     function sendLootBudget(uint256 palAmount, uint256 extraAmount) external nonReentrant onlyOwner() {
+        // Send the budget to the LootReserve
         IERC20(pal).safeTransfer(lootReserve, palAmount);
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }
 
+        // Notify the LootCreator of the new budget
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);
     }
 

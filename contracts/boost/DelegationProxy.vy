@@ -1,7 +1,7 @@
 # @version 0.3.3
 """
 @title Voting Escrow Delegation Proxy
-@author Curve Finance
+@author Curve Finance, modified by Paladin
 @license MIT
 """
 
@@ -61,9 +61,9 @@ def __init__(_voting_escrow: address, _delegation: address, _o_admin: address, _
 @external
 def adjusted_balance_of(_account: address) -> uint256:
     """
-    @notice Get the adjusted veCRV balance from the active boost delegation contract
-    @param _account The account to query the adjusted veCRV balance of
-    @return veCRV balance
+    @notice Get the adjusted hPalPower balance from the active boost delegation contract
+    @param _account The account to query the adjusted hPalPower balance of
+    @return hPalPower balance
     """
     _delegation: address = self.delegation
     if _delegation == ZERO_ADDRESS:
@@ -75,10 +75,10 @@ def adjusted_balance_of(_account: address) -> uint256:
 @external
 def adjusted_balance_of_at(_account: address, _ts: uint256) -> uint256:
     """
-    @notice Get the adjusted veCRV balance from the active boost delegation contract at a given timestamp
-    @param _account The account to query the adjusted veCRV balance of
+    @notice Get the adjusted hPalPower balance from the active boost delegation contract at a given timestamp
+    @param _account The account to query the adjusted hPalPower balance of
     @param _ts Timestamp to look at
-    @return veCRV balance
+    @return hPalPower balance
     """
     _delegation: address = self.delegation
     if _delegation == ZERO_ADDRESS:

@@ -50,23 +50,30 @@ contract HolyPalPower is IHolyPalPower {
     // External Methods
 
     function balanceOf(address user) external view returns(uint256) {
+        // Fetch user current Lock & return 0 if no Lock
         IHolyPaladinToken.UserLock memory currentLock = IHolyPaladinToken(hPal).getUserLock(user);
         if(currentLock.amount == 0) return 0;
         
+        // Calculate the end of the current Lock (rounded down to weeks) & return 0 if already expired
         uint256 endTimestamp = ((currentLock.startTimestamp + currentLock.duration) / WEEK) * WEEK;
         if(endTimestamp <= block.timestamp) return 0;
         
+        // Calculate the slope
         uint256 duration = endTimestamp - currentLock.startTimestamp;
         uint256 slope = currentLock.amount / duration;
 
+        // Calculate the balance based on the slope and end of the lock
         return (slope * (endTimestamp - block.timestamp));
     }
 
     function balanceOfAt(address user, uint256 timestamp) external view returns(uint256) {
+        // Fetch the user Lock for the given timestamp
         Point memory point = _convertLock(_findUserPastLock(user, timestamp));
 
+        // Return 0 if the found Lock was expired
         if(point.endTimestamp <= timestamp) return 0;
 
+        // Calculate the balance based on the slope and end of the lock
         return (uint128(point.slope) * (point.endTimestamp - timestamp));
     }
 
@@ -82,6 +89,7 @@ contract HolyPalPower is IHolyPalPower {
     // solhint-disable-next-line
     function locked__end(address user) external view returns(uint256) {
         IHolyPaladinToken.UserLock memory currentLock = IHolyPaladinToken(hPal).getUserLock(user);
+        // Round down the Lock end to weeks (for voting purposes)
         return ((currentLock.startTimestamp + currentLock.duration) / WEEK) * WEEK;
     }
 
@@ -125,6 +133,7 @@ contract HolyPalPower is IHolyPalPower {
         IHolyPaladinToken.UserLock memory emptyLock = IHolyPaladinToken.UserLock(0,0,0,0);
         IHolyPaladinToken _hPal = IHolyPaladinToken(hPal);
 
+        // Get user Lock count, return an empty Point if user never locked
         uint256 locksCount = _hPal.getUserLockCount(user);
         if(locksCount == 0) return emptyLock;
 

@@ -49,6 +49,7 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     event PalWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
     event ExtraWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
+    event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
 
 
     // Constructor
@@ -77,14 +78,17 @@ contract LootBudget is Owner, ReentrancyGuard {
         uint256 palAmount = palWeeklyBudget;
         uint256 extraAmount = extraWeeklyBudget;
 
+        // Set the current period as claimed
         if(periodBudgetClaimed[currentPeriod]) return;
         periodBudgetClaimed[currentPeriod] = true;
 
+        // Send the budget to the LootReserve
         IERC20(pal).safeTransfer(lootReserve, palAmount);
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }
 
+        // Notify the LootCreator of the new budget
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);
     }
 
@@ -103,6 +107,16 @@ contract LootBudget is Owner, ReentrancyGuard {
         extraWeeklyBudget = newBudget;
 
         emit ExtraWeeklyBudgetUpdated(oldBudget, newBudget);
+    }
+
+    function emptyReserve() external onlyOwner {
+        uint256 palBalance = IERC20(pal).balanceOf(address(this));
+        uint256 extraBalance = IERC20(extraToken).balanceOf(address(this));
+
+        IERC20(pal).safeTransfer(owner(), palBalance);
+        IERC20(extraToken).safeTransfer(owner(), extraBalance);
+
+        emit CancelReserve(palBalance, extraBalance);
     }
 
 }

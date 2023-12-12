@@ -83,7 +83,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
     event NewQuest(uint256 indexed questID, address rewardToken);
     /** @notice Event emitted when a Period of a Quest is updated (when the Merkle Root is added) */
     event QuestPeriodUpdated(uint256 indexed questID, uint256 indexed period, bytes32 merkleRoot);
-
+    /** @notice Event emitted when the Loot Creator address is updated */
     event LootCreatorUpdated(address indexed oldCreator, address indexed newCreator);
 
 
@@ -230,6 +230,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
             questRewardsPerPeriod[questID][claims[i].period] -= claims[i].amount;
             totalClaimAmount += claims[i].amount;
 
+            // Trigger Loot hook to store claim data for later Loot creation
             _triggerCreateLoot(
                 account,
                 questID,
@@ -257,6 +258,14 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         return questClosedPeriods[questID];
     }
 
+    /**
+    * @notice Triggers the notification of a Quest Claim to the Loot Creator contract
+    * @dev Triggers the notification of a Quest Claim to the Loot Creator contract
+    * @param user Address of the user
+    * @param questID ID of the Quest
+    * @param questID Timestamp of the period
+    * @param claimedAmount Amount of rewards claimed
+    */
     function _triggerCreateLoot(address user, uint256 questID, uint256 period, uint256 claimedAmount) internal {
         if(lootCreator != address(0)) {
             ILootCreator(lootCreator).notifyQuestClaim(
@@ -363,6 +372,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         // Add the new MerkleRoot for that Closed Period
         questMerkleRootPerPeriod[questID][period] = merkleRoot;
 
+        // If a Loot Creator is set, notify it of the new Quest Period distributed
         if(lootCreator != address(0)) {
             ILootCreator(lootCreator).notifyDistributedQuestPeriod(questID, period, totalAmount);
         }
@@ -375,6 +385,11 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
     //  Admin functions
 
+    /**
+    * @notice Sets the address for the Loot Creator
+    * @dev Sets the address for the Loot Creator
+    * @param _lootCreator Address of the Loot Creator
+    */
     function setLootCreator(address _lootCreator) external onlyOwner {
         address oldCreator = lootCreator;
         lootCreator = _lootCreator;
@@ -385,7 +400,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
     /**
     * @notice Recovers ERC2O tokens sent by mistake to the contract
     * @dev Recovers ERC2O tokens sent by mistake to the contract
-    * @param token Address tof the EC2O token
+    * @param token Address of the EC2O token
     * @return bool: success
     */
     function recoverERC20(address token) external onlyOwner nonReentrant returns(bool) {

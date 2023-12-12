@@ -273,25 +273,32 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external nonReentrant {
         if(!isProxyManager[user][msg.sender] && msg.sender != user) revert Errors.NotAllowedManager();
         if(maxPower == 0 || maxPower > MAX_BPS) revert Errors.VotingPowerInvalid();
+
+        // Round down the end timestamp to weeks & check the user Lock is not expired then
         endTimestamp = endTimestamp / WEEK * WEEK;
         uint256 userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
         if(endTimestamp < block.timestamp || endTimestamp > userLockEnd) revert Errors.InvalidTimestamp();
 
+        // Clear any expired past Proxy
         _clearExpiredProxies(user);
 
+        // Revert if the user already has a Proxy with the same address
         ProxyManager memory prevProxyState = proxyManagerState[user][proxy];
         if(prevProxyState.maxPower != 0) revert Errors.ProxyAlreadyActive();
 
+        // Block the user's power for the Proxy & revert if the user execeed's its voting power
         uint256 userBlockedPower = blockedProxyPower[user];
         if(userBlockedPower + maxPower > MAX_BPS) revert Errors.ProxyPowerExceeded();
         blockedProxyPower[user] = userBlockedPower + maxPower;
 
+        // Set up the Proxy
         proxyManagerState[user][proxy] = ProxyManager({
             maxPower: maxPower,
             usedPower: 0,
             endTimestamp: endTimestamp
         });
 
+        // Add the Proxy to the user's list
         currentUserProxyVoters[user].push(proxy);
 
         emit SetNewProxyVoter(user, proxy, maxPower, endTimestamp);
@@ -316,9 +323,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         for(uint256 i; i < length; i++) {
             address proxyVoter = proxies[i];
             if(proxyManagerState[user][proxyVoter].endTimestamp < block.timestamp) {
+                // Free the user blocked voting power
                 blockedProxyPower[user] -= proxyManagerState[user][proxyVoter].maxPower;
+                // Delete the Proxy
                 delete proxyManagerState[user][proxyVoter];
                 
+                // Remove the Proxy from the user's list
                 if(i != lastIndex) {
                     currentUserProxyVoters[user][i] = currentUserProxyVoters[user][length-1];
                 }
@@ -330,23 +340,29 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     function _voteForGauge(address user, address gauge, uint256 userPower, address caller) internal {
         VoteVars memory vars;
         
+        // Get the periods timestamps & user lock state
         vars.currentPeriod = (block.timestamp) / WEEK * WEEK;
         vars.nextPeriod = vars.currentPeriod + WEEK;
         vars.userSlope = IHolyPalPower(hPalPower).getUserPointAt(user, vars.currentPeriod).slope;
         vars.userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
 
+        // Check the gauge is listed & the user lock is not expired
         if(!_isGaugeListed(gauge)) revert Errors.NotListed();
         if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
+        // Check the user has enough voting power & the cooldown is respected
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
 
+        // Clear any expired past Proxy
         _clearExpiredProxies(user);
 
+        // Load the user past vote state
         VotedSlope memory oldSlope = voteUserSlopes[user][gauge];
         if(oldSlope.end > vars.nextPeriod) {
             vars.oldBias = oldSlope.slope * (oldSlope.end - vars.nextPeriod);
         }
 
+        // Calculate the new vote state
         VotedSlope memory newSlope = VotedSlope({
             slope: (convertInt128ToUint128(vars.userSlope) * userPower) / MAX_BPS,
             power: userPower,
@@ -355,10 +371,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         });
         vars.newBias = newSlope.slope * (vars.userLockEnd - vars.nextPeriod);
 
+        // Check if the caller is allowed to change this vote
         if(
             oldSlope.caller != caller && proxyManagerState[user][oldSlope.caller].endTimestamp > block.timestamp
         ) revert Errors.NotAllowedVoteChange();
 
+        // Update the voter used voting power & the proxy one if needed
         vars.totalPowerUsed = voteUserPower[user];
         vars.totalPowerUsed = vars.totalPowerUsed + newSlope.power - oldSlope.power;
         if(user == caller) {
@@ -381,15 +399,19 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(vars.totalPowerUsed > MAX_BPS) revert Errors.VotingPowerExceeded();
         voteUserPower[user] = vars.totalPowerUsed;
 
+        // Update the gauge weight
         vars.oldWeightBias = _updateGaugeWeight(gauge);
         vars.oldWeightSlope = pointsWeight[gauge][vars.nextPeriod].slope;
 
+        // Update the total weight
         vars.oldTotalBias = _updateTotalWeight();
         vars.oldTotalSlope = pointsWeightTotal[vars.nextPeriod].slope;
 
+        // Update the new gauge bias & total bias
         pointsWeight[gauge][vars.nextPeriod].bias = max(vars.oldWeightBias + vars.newBias, vars.oldBias) - vars.oldBias;
         pointsWeightTotal[vars.nextPeriod].bias = max(vars.oldTotalBias + vars.newBias, vars.oldBias) - vars.oldBias;
 
+        // Update the new gauge slope & total slope
         if(oldSlope.end > vars.nextPeriod) {
             pointsWeight[gauge][vars.nextPeriod].slope = max(vars.oldWeightSlope + newSlope.slope, oldSlope.slope) - oldSlope.slope;
             pointsWeightTotal[vars.nextPeriod].slope = max(vars.oldTotalSlope + newSlope.slope, oldSlope.slope) - oldSlope.slope;
@@ -398,6 +420,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
             pointsWeightTotal[vars.nextPeriod].slope += newSlope.slope;
         }
 
+        // Update the gauge slope changes & total slope changes
         if(oldSlope.end > block.timestamp) {
             changesWeight[gauge][oldSlope.end] -= oldSlope.slope;
             changesWeightTotal[oldSlope.end] -= oldSlope.slope;
@@ -405,6 +428,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         changesWeight[gauge][newSlope.end] += newSlope.slope;
         changesWeightTotal[newSlope.end] += newSlope.slope;
 
+        // Store the user vote state
         voteUserSlopes[user][gauge] = newSlope;
         lastUserVote[user][gauge] = block.timestamp;
 
