@@ -15,7 +15,6 @@ import {
     resetFork,
     getERC20
 } from "./utils/utils";
-import exp from "constants";
 
 chai.use(solidity);
 const { expect } = chai;

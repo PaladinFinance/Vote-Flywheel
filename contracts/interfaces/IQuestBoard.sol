@@ -34,6 +34,24 @@ interface IQuestBoard {
     
 	function getQuestIdsForPeriodForGauge(address gauge, uint256 period) external view returns(uint256[] memory);
     
+	function nextID() external view returns(uint256);
+
 	function quests(uint256 id) external view returns(Quest memory);
+
+    function updateDistributor(address newDistributor) external;
+    function createFixedQuest(
+        address gauge,
+        address rewardToken,
+        bool startNextPeriod,
+        uint48 duration,
+        uint256 rewardPerVote,
+        uint256 totalRewardAmount,
+        uint256 feeAmount,
+        QuestDataTypes.QuestVoteType voteType,
+        QuestDataTypes.QuestCloseType closeType,
+        address[] calldata voterList
+    ) external returns(uint256);
+    function closeQuestPeriod(uint256 period) external returns(uint256 closed, uint256 skipped);
+    function addMerkleRoot(uint256 questID, uint256 period, uint256 totalAmount, bytes32 merkleRoot) external;
 
 }

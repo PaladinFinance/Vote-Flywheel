@@ -545,7 +545,7 @@ describe('LootCreator contract tests', () => {
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
-            const new_period_budget = await creator.periodBudget(new_period)
+            const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
             
@@ -581,7 +581,7 @@ describe('LootCreator contract tests', () => {
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
-            const new_period_budget = await creator.periodBudget(new_period)
+            const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
             
@@ -614,7 +614,7 @@ describe('LootCreator contract tests', () => {
 
             await gauge.connect(admin).sendLootBudget(pal_amount, extra_amount)
 
-            period = await creator.nextBudgetUpdatePeriod()
+            period = (await creator.nextBudgetUpdatePeriod()).sub(WEEK)
 
             await controller.connect(admin).setGaugeWeightAt(questGauge1.address, period, ethers.utils.parseEther("0.25"))
             await controller.connect(admin).setGaugeWeightAt(questGauge1.address, period, ethers.utils.parseEther("0.2"))
@@ -645,8 +645,8 @@ describe('LootCreator contract tests', () => {
 
             const prev_period = await creator.nextBudgetUpdatePeriod()
 
-            const past_period_budget = await creator.periodBudget(prev_period.sub(WEEK))
-            const past_period_allocated = await creator.allocatedBudgetHistory(prev_period.sub(WEEK))
+            const past_period_budget = await creator.periodBudget(prev_period.sub(WEEK.mul(2)))
+            const past_period_allocated = await creator.allocatedBudgetHistory(prev_period.sub(WEEK.mul(2)))
 
             expect(past_period_allocated.palAmount).not.to.be.eq(0)
             expect(past_period_allocated.extraAmount).not.to.be.eq(0)
@@ -662,7 +662,7 @@ describe('LootCreator contract tests', () => {
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
-            const new_period_budget = await creator.periodBudget(new_period)
+            const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount.add(
                 past_period_budget.palAmount.sub(past_period_allocated.palAmount)
             ))
@@ -1209,10 +1209,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.id).to.be.eq(loot_id)
             expect(new_loot.palAmount).to.be.eq(expected_pal_amount)
             expect(new_loot.extraAmount).to.be.eq(expected_extra_amount)
-            expect(new_loot.startTs).to.be.eq(period)
+            expect(new_loot.startTs).to.be.eq(period.add(WEEK))
             expect(new_loot.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1260,10 +1260,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.id).to.be.eq(loot_id)
             expect(new_loot.palAmount).to.be.eq(expected_pal_amount)
             expect(new_loot.extraAmount).to.be.eq(expected_extra_amount)
-            expect(new_loot.startTs).to.be.eq(period)
+            expect(new_loot.startTs).to.be.eq(period.add(WEEK))
             expect(new_loot.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1305,10 +1305,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.id).to.be.eq(loot_id)
             expect(new_loot.palAmount).to.be.eq(expected_pal_amount)
             expect(new_loot.extraAmount).to.be.eq(expected_extra_amount)
-            expect(new_loot.startTs).to.be.eq(period)
+            expect(new_loot.startTs).to.be.eq(period.add(WEEK))
             expect(new_loot.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
 
             const new_pending_budget = await creator.pengingBudget()
 
@@ -1348,10 +1348,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.id).to.be.eq(loot_id)
             expect(new_loot.palAmount).to.be.eq(expected_pal_amount)
             expect(new_loot.extraAmount).to.be.eq(expected_extra_amount)
-            expect(new_loot.startTs).to.be.eq(period)
+            expect(new_loot.startTs).to.be.eq(period.add(WEEK))
             expect(new_loot.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
 
             const new_pending_budget = await creator.pengingBudget()
 
@@ -1663,10 +1663,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot1.id).to.be.eq(loot_id1)
             expect(new_loot1.palAmount).to.be.eq(expected_pal_amount1)
             expect(new_loot1.extraAmount).to.be.eq(expected_extra_amount1)
-            expect(new_loot1.startTs).to.be.eq(period)
+            expect(new_loot1.startTs).to.be.eq(period.add(WEEK))
             expect(new_loot1.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id1, expected_pal_amount1, expected_extra_amount1, period)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id1, expected_pal_amount1, expected_extra_amount1, period.add(WEEK))
             
             const undistributed_pal1 = quest_allocation1.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier1)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra1 = quest_allocation1.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier1)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1691,10 +1691,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot2.id).to.be.eq(loot_id2)
             expect(new_loot2.palAmount).to.be.eq(expected_pal_amount2)
             expect(new_loot2.extraAmount).to.be.eq(expected_extra_amount2)
-            expect(new_loot2.startTs).to.be.eq(period2)
+            expect(new_loot2.startTs).to.be.eq(period2.add(WEEK))
             expect(new_loot2.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id2, expected_pal_amount2, expected_extra_amount2, period2)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id2, expected_pal_amount2, expected_extra_amount2, period2.add(WEEK))
             
             const undistributed_pal2 = quest_allocation2.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier2)).div(UNIT).mul(claim_amount2).div(UNIT)
             const undistributed_extra2 = quest_allocation2.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier2)).div(UNIT).mul(claim_amount2).div(UNIT)
@@ -1719,10 +1719,10 @@ describe('LootCreator contract tests', () => {
             expect(new_loot3.id).to.be.eq(loot_id3)
             expect(new_loot3.palAmount).to.be.eq(expected_pal_amount3)
             expect(new_loot3.extraAmount).to.be.eq(expected_extra_amount3)
-            expect(new_loot3.startTs).to.be.eq(period3)
+            expect(new_loot3.startTs).to.be.eq(period3.add(WEEK))
             expect(new_loot3.claimed).to.be.false
 
-            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id3, expected_pal_amount3, expected_extra_amount3, period3)
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id3, expected_pal_amount3, expected_extra_amount3, period3.add(WEEK))
             
             const undistributed_pal3 = quest_allocation3.palPerVote.mul(MAX_MULTIPLIER.sub(expected_pal_amount3)).div(UNIT).mul(claim_amount3).div(UNIT)
             const undistributed_extra3 = quest_allocation3.extraPerVote.mul(MAX_MULTIPLIER.sub(expected_pal_amount3)).div(UNIT).mul(claim_amount3).div(UNIT)
@@ -1822,6 +1822,8 @@ describe('LootCreator contract tests', () => {
                 quest_id,
                 period,
             )
+
+            await advanceTime(WEEK.toNumber())
 
             const user_loots = await loot.getAllUserLoot(user1.address)
             loot_id = (user_loots[user_loots.length - 1]).id

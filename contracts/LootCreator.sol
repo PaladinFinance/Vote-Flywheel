@@ -99,6 +99,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     event NewDistributorListed(address indexed distributor);
     event DistributorUnlisted(address indexed distributor);
+    event GaugeUpdated(address indexed oldGauge, address indexed newGauge);
 
 
     // Modifiers
@@ -303,12 +304,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         pengingBudget = Budget(0, 0);
 
         // 2 weeks difference to not impact the current distribution and allocations
-        Budget memory previousBudget = periodBudget[nextBudgetUpdatePeriod - WEEK];
-        Budget memory previousSpent = allocatedBudgetHistory[nextBudgetUpdatePeriod - WEEK];
+        uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
+        Budget memory previousBudget = periodBudget[lastFinishedPeriod];
+        Budget memory previousSpent = allocatedBudgetHistory[lastFinishedPeriod];
         pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
         pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
 
-        periodBudget[nextBudgetUpdatePeriod + WEEK] = pending;
+        periodBudget[nextBudgetUpdatePeriod] = pending;
 
         nextBudgetUpdatePeriod += WEEK;
     }
@@ -354,7 +356,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         }
 
         // create the Loot
-        Loot(loot).createLoot(user, period, vars.userPalAmount, vars.userExtraAmount);
+        Loot(loot).createLoot(user, period + WEEK, vars.userPalAmount, vars.userExtraAmount);
 
     }
 
@@ -392,6 +394,16 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         }
 
         emit DistributorUnlisted(distributor);
+    }
+
+    function updateLootGauge(address newGauge) external onlyOwner {
+        if(newGauge == address(0)) revert Errors.AddressZero();
+        if(lootGauge == newGauge) revert Errors.SameAddress();
+
+        address oldGauge = lootGauge;
+        lootGauge = newGauge;
+
+        emit GaugeUpdated(oldGauge, newGauge);
     }
 
 

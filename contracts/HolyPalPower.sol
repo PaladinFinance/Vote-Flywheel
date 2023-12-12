@@ -82,7 +82,7 @@ contract HolyPalPower is IHolyPalPower {
     // solhint-disable-next-line
     function locked__end(address user) external view returns(uint256) {
         IHolyPaladinToken.UserLock memory currentLock = IHolyPaladinToken(hPal).getUserLock(user);
-        return currentLock.startTimestamp + currentLock.duration;
+        return ((currentLock.startTimestamp + currentLock.duration) / WEEK) * WEEK;
     }
 
     function totalSupply() external view returns(uint256) {

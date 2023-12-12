@@ -492,7 +492,7 @@ describe('Loot contract tests', () => {
 
         });
 
-        it(' should claim a Loot correctly wit hthe full amounts after the vesting is over', async () => {
+        it(' should claim a Loot correctly with the full amounts after the vesting is over', async () => {
 
             const prev_pal_balance = await pal.balanceOf(user1.address)
             const prev_extra_balance = await extraToken.balanceOf(user1.address)

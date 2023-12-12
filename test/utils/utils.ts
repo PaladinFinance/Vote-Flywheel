@@ -8,14 +8,14 @@ const { provider } = ethers;
 
 require("dotenv").config();
 
-export async function resetFork() {
+export async function resetFork(block_number = 18428190) {
     await hre.network.provider.request({
         method: "hardhat_reset",
         params: [
             {
                 forking: {
                     jsonRpcUrl: "https://eth-mainnet.alchemyapi.io/v2/" + (process.env.ALCHEMY_API_KEY || ''),
-                    blockNumber: 18428190
+                    blockNumber: block_number,
                 },
                 gas: 30000000,
             },
