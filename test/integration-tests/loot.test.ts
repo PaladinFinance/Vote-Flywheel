@@ -455,10 +455,10 @@ describe('Vote Controller - Voting tests', () => {
 
             // check allocated amount for Quests rewards
 
-            expect(await creator.totalQuestPeriodRewards(quest_id1, closed_period)).to.be.eq(rewards_per_period)
-            expect(await creator.totalQuestPeriodRewards(quest_id2, closed_period)).to.be.eq(rewards_per_period2)
-            expect(await creator.totalQuestPeriodSet(quest_id1, closed_period)).to.be.true
-            expect(await creator.totalQuestPeriodSet(quest_id2, closed_period)).to.be.true
+            expect(await creator.totalQuestPeriodRewards(distributor1.address, quest_id1, closed_period)).to.be.eq(rewards_per_period)
+            expect(await creator.totalQuestPeriodRewards(distributor2.address, quest_id2, closed_period)).to.be.eq(rewards_per_period2)
+            expect(await creator.totalQuestPeriodSet(distributor1.address, quest_id1, closed_period)).to.be.true
+            expect(await creator.totalQuestPeriodSet(distributor2.address, quest_id2, closed_period)).to.be.true
 
             expect(await creator.nextBudgetUpdatePeriod()).to.be.eq(prev_budget_period.add(WEEK))
             expect(await creator.periodBlockCheckpoint(prev_budget_period)).to.be.eq(tx_block)
@@ -484,6 +484,8 @@ describe('Vote Controller - Voting tests', () => {
             const gauge_weight2 = await controller["getGaugeRelativeWeight(address,uint256)"](VALID_GAUGES[2].gauge, closed_period)
             const gauge_cap2 = await controller.getGaugeCap(VALID_GAUGES[2].gauge)
 
+            expect(gauge_weight2).to.be.gt(gauge_cap2)
+
             const gauge_pal_amount2 = period_budget.palAmount.mul(gauge_cap2).div(UNIT)
             const gauge_extra_amount2 = period_budget.extraAmount.mul(gauge_cap2).div(UNIT)
 
@@ -504,12 +506,12 @@ describe('Vote Controller - Voting tests', () => {
             expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount).add(gauge_extra_amount2))
             
             expect(await creator.isGaugeAllocatedForPeriod(VALID_GAUGES[0].gauge, closed_period)).to.be.true
-            expect(await creator.totalQuestPeriodSet(quest_id1, closed_period)).to.be.true
-            expect(await creator.totalQuestPeriodRewards(quest_id1, closed_period)).to.be.eq(rewards_per_period)
+            expect(await creator.totalQuestPeriodSet(distributor1.address, quest_id1, closed_period)).to.be.true
+            expect(await creator.totalQuestPeriodRewards(distributor1.address, quest_id1, closed_period)).to.be.eq(rewards_per_period)
 
             expect(await creator.isGaugeAllocatedForPeriod(VALID_GAUGES[2].gauge, closed_period)).to.be.true
-            expect(await creator.totalQuestPeriodSet(quest_id2, closed_period)).to.be.true
-            expect(await creator.totalQuestPeriodRewards(quest_id2, closed_period)).to.be.eq(rewards_per_period2)
+            expect(await creator.totalQuestPeriodSet(distributor2.address, quest_id2, closed_period)).to.be.true
+            expect(await creator.totalQuestPeriodRewards(distributor2.address, quest_id2, closed_period)).to.be.eq(rewards_per_period2)
 
         });
 

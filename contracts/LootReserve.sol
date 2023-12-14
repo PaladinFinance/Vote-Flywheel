@@ -26,16 +26,22 @@ contract LootReserve is Owner {
 
     // Storage
 
+    /** @notice PAL token contract */
     IERC20 public immutable pal;
+    /** @notice Extra token contract */
     IERC20 public immutable extraToken;
 
+    /** @notice Address of the Loot contract */
     address public loot;
 
 
     // Events
 
+    /** @notice Event emitted when the contract is initialized */
     event Init(address loot);
+    /** @notice Event emitted when the Max allowance is set for the Loot contract */
     event MaxAllowanceSet(address indexed token, address indexed spender);
+    /** @notice Event emitted when the Reserve is canceled and token claimed back */
     event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
 
 
@@ -49,6 +55,11 @@ contract LootReserve is Owner {
         extraToken = IERC20(_extraToken);
     }
 
+    /**
+    * @notice Initialize the contract
+    * @dev Initialize the contract
+    * @param _loot Address of the Loot contract
+    */
     function init(address _loot) external onlyOwner {
         if(loot != address(0)) revert Errors.CreatorAlreadySet();
         loot = _loot;
@@ -65,11 +76,23 @@ contract LootReserve is Owner {
 
     // View functions
 
+    /**
+    * @notice Get this contract balances
+    * @dev Get this contract PAL & extra token balances
+    * @return palBalance (uint256) : PAL token balance
+    * @return extraBalance (uint256) : extra token balance
+    */
     function getBalances() external view returns(uint256 palBalance, uint256 extraBalance){
         palBalance = pal.balanceOf(address(this));
         extraBalance = extraToken.balanceOf(address(this));
     }
 
+    /**
+    * @notice Get this contract remaining allowances for the Loot contract
+    * @dev Get this contract remaining allowances in PAL & extra token for the Loot contract
+    * @return palAllowance (uint256) : PAL remaining allowance
+    * @return extraAllowance (uint256) : extra remaining allowance
+    */
     function getRemainingAllowances() external view returns(uint256 palAllowance, uint256 extraAllowance){
         palAllowance = pal.allowance(address(this), loot);
         extraAllowance = extraToken.allowance(address(this), loot);
@@ -78,6 +101,10 @@ contract LootReserve is Owner {
 
     // Admin functions
 
+    /**
+    * @notice Resets the allowances for the Loot contract
+    * @dev Resets the allowances for the Loot contract to max uint256
+    */
     function resetMaxAllowance() external onlyOwner {
         pal.approve(loot, type(uint256).max);
         extraToken.approve(loot, type(uint256).max);
@@ -86,6 +113,10 @@ contract LootReserve is Owner {
         emit MaxAllowanceSet(address(extraToken), loot);
     }
 
+    /**
+    * @notice Empty this contract and send all tokens to the owner
+    * @dev Empty this contract and send all tokens to the owner
+    */
     function emptyReserve() external onlyOwner {
         uint256 palBalance = pal.balanceOf(address(this));
         uint256 extraBalance = extraToken.balanceOf(address(this));

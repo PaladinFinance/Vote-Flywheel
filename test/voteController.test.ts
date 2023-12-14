@@ -3181,7 +3181,7 @@ describe('LootVoteController contract tests', () => {
             expect(new_proxy_list.length).to.be.eq(old_proxy_list.length + 1)
             expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter1.address)
 
-            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state = await controller.proxyVoterState(user1.address, proxyVoter1.address)
 
             expect(proxy_state.maxPower).to.be.eq(proxy_power)
             expect(proxy_state.usedPower).to.be.eq(0)
@@ -3207,7 +3207,7 @@ describe('LootVoteController contract tests', () => {
             const old_proxy_list = await controller.getUserProxyVoters(user1.address)
 
             const tx = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, end_ts)
-            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state = await controller.proxyVoterState(user1.address, proxyVoter1.address)
 
             expect(proxy_state.maxPower).to.be.eq(proxy_power)
             expect(proxy_state.usedPower).to.be.eq(0)
@@ -3217,7 +3217,7 @@ describe('LootVoteController contract tests', () => {
 
             const tx2 = await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power2, end_ts2)
 
-            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            const proxy_state2 = await controller.proxyVoterState(user1.address, proxyVoter2.address)
 
             expect(proxy_state2.maxPower).to.be.eq(proxy_power2)
             expect(proxy_state2.usedPower).to.be.eq(0)
@@ -3257,13 +3257,13 @@ describe('LootVoteController contract tests', () => {
             expect(new_proxy_list.length).to.be.eq(old_proxy_list.length)
             expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter2.address)
 
-            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            const proxy_state = await controller.proxyVoterState(user1.address, proxyVoter2.address)
 
             expect(proxy_state.maxPower).to.be.eq(proxy_power)
             expect(proxy_state.usedPower).to.be.eq(0)
             expect(proxy_state.endTimestamp).to.be.eq(end_ts)
 
-            const old_proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const old_proxy_state = await controller.proxyVoterState(user1.address, proxyVoter1.address)
 
             expect(old_proxy_state.maxPower).to.be.eq(0)
             expect(old_proxy_state.usedPower).to.be.eq(0)
@@ -3309,7 +3309,7 @@ describe('LootVoteController contract tests', () => {
             expect(new_proxy_list.length).to.be.eq(old_proxy_list.length + 1)
             expect(new_proxy_list[new_proxy_list.length - 1]).to.be.eq(proxyVoter1.address)
 
-            const proxy_state = await controller.proxyManagerState(user1.address, proxyVoter1.address)
+            const proxy_state = await controller.proxyVoterState(user1.address, proxyVoter1.address)
 
             expect(proxy_state.maxPower).to.be.eq(proxy_power)
             expect(proxy_state.usedPower).to.be.eq(0)
@@ -3503,8 +3503,8 @@ describe('LootVoteController contract tests', () => {
             expect(new_user_proxy_list).to.be.deep.eq(prev_user_proxy_list)
             expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power)
 
-            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
-            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            const proxy_state1 = await controller.proxyVoterState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyVoterState(user1.address, proxyVoter2.address)
             
             expect(proxy_state1.maxPower).not.to.be.eq(0)
             expect(proxy_state2.maxPower).not.to.be.eq(0)
@@ -3530,8 +3530,8 @@ describe('LootVoteController contract tests', () => {
             expect(new_user_proxy_list.includes(proxyVoter1.address)).to.be.false
             expect(await controller.blockedProxyPower(user1.address)).to.be.eq(prev_blocked_power.sub(proxy_power))
 
-            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
-            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            const proxy_state1 = await controller.proxyVoterState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyVoterState(user1.address, proxyVoter2.address)
             
             expect(proxy_state1.maxPower).to.be.eq(0)
             expect(proxy_state2.maxPower).not.to.be.eq(0)
@@ -3555,8 +3555,8 @@ describe('LootVoteController contract tests', () => {
             expect(new_user_proxy_list.includes(proxyVoter2.address)).to.be.false
             expect(await controller.blockedProxyPower(user1.address)).to.be.eq(0)
 
-            const proxy_state1 = await controller.proxyManagerState(user1.address, proxyVoter1.address)
-            const proxy_state2 = await controller.proxyManagerState(user1.address, proxyVoter2.address)
+            const proxy_state1 = await controller.proxyVoterState(user1.address, proxyVoter1.address)
+            const proxy_state2 = await controller.proxyVoterState(user1.address, proxyVoter2.address)
             
             expect(proxy_state1.maxPower).to.be.eq(0)
             expect(proxy_state2.maxPower).to.be.eq(0)
@@ -3676,7 +3676,7 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
             const user_prev_free_power = await controller.usedFreePower(user1.address)
-            const user_prev_used_proxy_power = (await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower
+            const user_prev_used_proxy_power = (await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower
 
             const user_point = await power.getUserPointAt(user1.address, current_ts)
 
@@ -3691,7 +3691,7 @@ describe('LootVoteController contract tests', () => {
 
             expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power.add(vote_power))
             expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_free_power)
-            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
+            expect((await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
 
             const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
             const new_total_point = await controller.pointsWeightTotal(next_period)
@@ -3803,7 +3803,7 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
             const user_prev_free_power = await controller.usedFreePower(user1.address)
-            const user_prev_used_proxy_power = (await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower
+            const user_prev_used_proxy_power = (await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower
 
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
@@ -3819,7 +3819,7 @@ describe('LootVoteController contract tests', () => {
 
             expect(await controller.voteUserPower(user1.address)).to.be.eq(user_prev_used_power)
             expect(await controller.usedFreePower(user1.address)).to.be.eq(user_prev_free_power.sub(vote_power))
-            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
+            expect((await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(user_prev_used_proxy_power.add(vote_power))
 
             const new_gauge_point1 = await controller.pointsWeight(gauge1.address, next_period)
             const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
@@ -4109,7 +4109,7 @@ describe('LootVoteController contract tests', () => {
                 vote_power + vote_power2 + vote_power3
             ))
 
-            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(
+            expect((await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(
                 vote_power + vote_power2 + vote_power3
             )
 
@@ -4260,7 +4260,7 @@ describe('LootVoteController contract tests', () => {
                 new_vote_power2 + new_vote_power3 + new_vote_power4
             ))
 
-            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(new_vote_power2 + new_vote_power3 + new_vote_power4)
+            expect((await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(new_vote_power2 + new_vote_power3 + new_vote_power4)
 
             const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
             const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
@@ -4438,7 +4438,7 @@ describe('LootVoteController contract tests', () => {
                 new_vote_power2 + new_vote_power3 + new_vote_power4
             ))
 
-            expect((await controller.proxyManagerState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(0)
+            expect((await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower).to.be.eq(0)
 
             const new_gauge_point = await controller.pointsWeight(gauge1.address, next_period)
             const new_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)

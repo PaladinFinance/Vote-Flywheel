@@ -20,7 +20,8 @@ import "./libraries/Errors.sol";
 /** @title Loot Gauge contract */
 /// @author Paladin
 /*
-    TODO: Add comments
+    Gauge to be used with the BudgetController for PAL incentives,
+    handling the part of incentives to be allocated to the Loot system
 */
 
 contract LootGauge is Owner, ReentrancyGuard {
@@ -28,17 +29,23 @@ contract LootGauge is Owner, ReentrancyGuard {
 
     // Storage
 
+    /** @notice Address of the PAL token */
     address immutable public pal;
+    /** @notice Address of the extra token */
     address immutable public extraToken;
     
+    /** @notice Address of the Loot Creator contract */
     address immutable public lootCreator;
+    /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
 
+    /** @notice Address of the Budget Controller contract */
     address public budgetController;
 
 
     // Events
 
+    /** @notice Event emitted when the Budget Controller address is set */
     event BudgetControllerSet(address indexed budgetController);
 
 
@@ -56,6 +63,11 @@ contract LootGauge is Owner, ReentrancyGuard {
         lootReserve = _lootReserve;
     }
 
+    /**
+    * @notice Set the BudgetController contract address
+    * @dev Set the BudgetController contract address
+    * @param _budgetController Address of the BudgetController contract
+    */
     function setBudgetController(address _budgetController) external onlyOwner {
         budgetController = _budgetController;
 
@@ -65,6 +77,10 @@ contract LootGauge is Owner, ReentrancyGuard {
 
     // State-changing functions
 
+    /**
+    * @notice Update the period budget
+    * @dev Claim the period budget from the BudgetController & send the period budget to the LootReserve (PAL & extra token if set)
+    */
     function updateLootBudget() external nonReentrant {
         if(budgetController == address(0)) return;
 
@@ -85,6 +101,12 @@ contract LootGauge is Owner, ReentrancyGuard {
 
     // Admin functions
 
+    /**
+    * @notice Send budget to the Loot system
+    * @dev Send budget to the LootReserve (PAL & extra token if set)
+    * @param palAmount Amount of PAL to send
+    * @param extraAmount Amount of extra token to send
+    */
     function sendLootBudget(uint256 palAmount, uint256 extraAmount) external nonReentrant onlyOwner() {
         // Send the budget to the LootReserve
         IERC20(pal).safeTransfer(lootReserve, palAmount);

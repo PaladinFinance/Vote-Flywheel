@@ -23,7 +23,7 @@ import "./libraries/Errors.sol";
 /** @title Loot Creator contract */
 /// @author Paladin
 /*
-    TODO
+    Contract handling the Budget for gauges & Quests and the Loot creation
 */
 contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
@@ -32,25 +32,31 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     /** @notice Seconds in a Week */
     uint256 private constant WEEK = 604800;
 
+    /** @notice Scale unit (1e18) */
     uint256 private constant UNIT = 1e18;
 
+    /** @notice Base Multiplier for Loot rewards */
     uint256 public constant BASE_MULTIPLIER = 1e18;
 
+    /** @notice Max Multiplier for Loot rewards */
     uint256 public constant MAX_MULTIPLIER = 5e18;
 
 
     // Structs
 
+    /** @notice Budget struct */
     struct Budget {
         uint128 palAmount;
         uint128 extraAmount;
     }
 
+    /** @notice Allocation strcut */
     struct Allocation {
         uint128 palPerVote;
         uint128 extraPerVote;
     }
 
+    /** @notice Struct use in memory for Loot creation method */
     struct CreateVars {
         address gauge;
         uint256 userPower;
@@ -67,53 +73,74 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // Storage
 
-    // immutables here
+    /** @notice Address of the Loot contract */
     address public immutable loot;
+    /** @notice Address of the Loot Vote Controller contract */
     address public immutable lootVoteController;
+    /** @notice Address of the HolyPalPower contract */
     address public immutable holyPower;
+    /** @notice Address of the Loot Gauge or Budget contract */
     address public lootGauge;
 
+    /** @notice Quest Distributors allowed to intract with this contract */
     mapping(address => bool) public allowedDistributors;
+    /** @notice List of listed Quest Distributors */
     address[] public distributors;
 
+    /** @notice Timestamp of the next Budget update */
     uint256 public nextBudgetUpdatePeriod;
 
+    /** @notice Current pending budget to be used during next period */
     Budget public pengingBudget;
 
+    /** @notice Budgets for each period */
     mapping(uint256 => Budget) public periodBudget;
+    /** @notice History of allocated amounts from the Budget of each period */
     mapping(uint256 => Budget) public allocatedBudgetHistory;
 
+    /** @notice Budget allocated to a Gauge for each period */
     mapping(address => mapping(uint256 => Budget)) public gaugeBudgetPerPeriod;
+    /** @notice Was the gauge allocated a Budget for each period */
     mapping(address => mapping(uint256 => bool)) public isGaugeAllocatedForPeriod;
 
+    /** @notice Checkpointed block number for each period */
     mapping(uint256 => uint256) public periodBlockCheckpoint;
 
-    // id -> period -> total
-    mapping(uint256 => mapping(uint256 => uint256)) public totalQuestPeriodRewards;
-    mapping(uint256 => mapping(uint256 => bool)) public totalQuestPeriodSet;
+    /** @notice Total Rewards distributed for a period for a Quest */
+    // distributor -> id -> period -> total
+    mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public totalQuestPeriodRewards;
+    /** @notice Was the total reward set for a Quest period */
+    mapping(address => mapping(uint256 => mapping(uint256 => bool))) public totalQuestPeriodSet;
+    /** @notice User claime damount for a Quest period */
     // distributor -> id -> period -> user -> amount
     mapping(address => mapping(uint256 => mapping(uint256 => mapping(address => uint256)))) public userQuestPeriodRewards;
 
 
     // Events
 
+    /** @notice Event emitted when a new Distributor is listed */
     event NewDistributorListed(address indexed distributor);
+    /** @notice Event emitted when Distributor is unlisted */
     event DistributorUnlisted(address indexed distributor);
+    /** @notice Event emitted when the budget Gauge is updated */
     event GaugeUpdated(address indexed oldGauge, address indexed newGauge);
 
 
     // Modifiers
 
+    /** @notice Checks the caller is an allowed Distributor */
     modifier onlyAllowedDistributor() {
         if(!allowedDistributors[msg.sender]) revert Errors.CallerNotAllowed();
         _;
     }
 
+    /** @notice Checks the caller is the Loot contract */
     modifier onlyLoot() {
         if(msg.sender != loot) revert Errors.CallerNotAllowed();
         _;
     }
 
+    /** @notice Checks the caller is the Loot Gauge contract */
     modifier onlyGauge() {
         if(msg.sender != lootGauge) revert Errors.CallerNotAllowed();
         _;
@@ -134,6 +161,11 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         nextBudgetUpdatePeriod = (block.timestamp + WEEK) / WEEK * WEEK;
     }
 
+    /**
+    * @notice Initialize the contract
+    * @dev Init the contract with the Loot Gauge/Budget address
+    * @param _lootGauge Address of the Loot Gauge or Budget address
+    */
     function init(address _lootGauge) external onlyOwner {
         if(_lootGauge == address(0)) revert Errors.AddressZero();
         if(lootGauge != address(0)) revert Errors.AlreadyInitialized();
@@ -144,11 +176,24 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // View functions
 
+    /**
+    * @notice Returns the global budget for a period
+    * @param period Timestamp of the period
+    * @return palAmount (uint256) : Amount of PAL tokens allocated for the period
+    * @return extraAmount (uint25 : Amount of extra tokens allocated for the period
+    */
     function getBudgetForPeriod(uint256 period) external view returns(uint256 palAmount, uint256 extraAmount) {
         palAmount = periodBudget[period].palAmount;
         extraAmount = periodBudget[period].extraAmount;
     }
 
+    /**
+    * @notice Returns the gauge budget for a period
+    * @param gauge Address of the gauge
+    * @param period Timestamp of the period
+    * @return palAmount (uint256) : Amount of PAL tokens allocated for the period
+    * @return extraAmount (uint25 : Amount of extra tokens allocated for the period
+    */
     function getGaugeBudgetForPeriod(
         address gauge,
         uint256 period
@@ -158,6 +203,14 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         extraAmount = budget.extraAmount;
     }
 
+    /**
+    * @notice Returns the allocation for a Quest for a period
+    * @param questId ID of the Quest
+    * @param distributor Address of the Distributor handling the Quest rewards
+    * @param period Timestamp of the period
+    * @return palPerVote (uint256) : Amount of PAL tokens allocated for the period
+    * @return extraPerVote (uint25 : Amount of extra tokens allocated for the period
+    */
     function getQuestAllocationForPeriod(
         uint256 questId,
         address distributor,
@@ -169,6 +222,10 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         extraPerVote = allocation.extraPerVote;
     }
 
+    /**
+    * @notice Returns all listed Distributors
+    * @return uint256 : List of Distributors
+    */
     function getListedDistributors() external view returns(address[] memory) {
         return distributors;
     }
@@ -176,16 +233,33 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // State-changing functions
 
+    /**
+    * @notice Creates a Loot for a user
+    * @dev Creates a Loot for a user based on the Quest rewards for the period
+    * @param user Address of the user
+    * @param distributor Address of the Distributor handling the Quest rewards
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    */
     function createLoot(address user, address distributor, uint256 questId, uint256 period) external nonReentrant {
         _createLoot(user, distributor, questId, period);
     }
 
     struct MultiCreate {
+        // Address of the Distributor handling the Quest rewards
         address distributor;
+        // ID of the Quest
         uint256 questId;
+        // Timestamp of the period
         uint256 period;
     }
 
+    /**
+    * @notice Creates multiple Loots for a user
+    * @dev Creates multiple Loots for a user based on the Quest rewards for each period
+    * @param user Address of the user
+    * @param params Quest claim parameters (distributor, questId, period)
+    */
     function createMultipleLoot(address user, MultiCreate[] calldata params) external nonReentrant {
         uint256 length = params.length;
         if(length == 0) revert Errors.EmptyParameters();
@@ -195,10 +269,25 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         }
     }
 
+    /**
+    * @notice Notifies of a Quest claim
+    * @dev Notofies of the amount claimed by a user on a Quest for later Loot creation
+    * @param user Address of the user
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    * @param claimedAmount Amount of rewards claimed by the user
+    */
     function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor nonReentrant {
         userQuestPeriodRewards[msg.sender][questId][period][user] = claimedAmount;
     }
 
+    /**
+    * @notice Notifies of a Quest period distribution
+    * @dev Notofies of the amount distributed on a Quest for a period & allocates the budget for a gauge if needed
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    * @param totalRewards Total amount of rewards distributed for the period for the Quest
+    */
     function notifyDistributedQuestPeriod(uint256 questId, uint256 period, uint256 totalRewards) external onlyAllowedDistributor nonReentrant {
         // Pull any new budget & update the current period to have an up to date budget
         _pullBudget();
@@ -209,9 +298,9 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         if(!ILootVoteController(lootVoteController).isListedGauge(gauge)) return;
 
         // If not set yet, set the total rewards for the quest & period
-        if(!totalQuestPeriodSet[questId][period]) {
-            totalQuestPeriodRewards[questId][period] = totalRewards;
-            totalQuestPeriodSet[questId][period] = true;
+        if(!totalQuestPeriodSet[msg.sender][questId][period]) {
+            totalQuestPeriodRewards[msg.sender][questId][period] = totalRewards;
+            totalQuestPeriodSet[msg.sender][questId][period] = true;
         }
 
         // If the period is already allocated for the gauge, return
@@ -252,17 +341,32 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     }
 
+    /**
+    * @notice Notifies of undistributed rewards
+    * @dev Notifies the amount of rewards slashed from a claimed Loot & add them to the pending budget
+    * @param palAmount Amount of PAL tokens slashed
+    */
 	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot nonReentrant {
         // Add undistributed rewards from Loot to the pending budget
         pengingBudget.palAmount += uint128(palAmount);
     }
 
+    /**
+    * @notice Notifies of new budget
+    * @dev Notifies the amount of rewards added to the pending budget from the Loot Gauge/Budget contract
+    * @param palAmount Amount of PAL tokens added to the budget
+    * @param extraAmount Amount of extra tokens added to the budget
+    */
 	function notifyNewBudget(uint256 palAmount, uint256 extraAmount) external onlyGauge {
         // Update the pending budget with the new budget from the gauge
         pengingBudget.palAmount += uint128(palAmount);
         pengingBudget.extraAmount += uint128(extraAmount);
     }
 
+    /**
+    * @notice Updates the period
+    * @dev Updates the period by pulling the new budget and updating the current period budget
+    */
     function updatePeriod() external {
         _pullBudget();
         _updatePeriod();
@@ -271,11 +375,20 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // Internal functions
 
+    /**
+    * @dev Pulls any new Budget from the Loot Gauge/Budget contract
+    */
     function _pullBudget() internal {
         if(lootGauge == address(0)) return;
         ILootGauge(lootGauge).updateLootBudget();
     }
 
+    /**
+    * @dev Returns the gauge for a Quest
+    * @param questId ID of the Quest
+    * @param distributor Address of the Distributor handling the Quest rewards
+    * @return address : Address of the gauge
+    */
     function _getQuestGauge(
         uint256 questId,
         address distributor
@@ -284,6 +397,14 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         return IQuestBoard(board).quests(questId).gauge;
     }
 
+    /**
+    * @dev Returns the allocation of a Quest for a period based on the budget for a gauge & the number of Quests for the gauge for this period
+    * @param gauge Address of the gauge
+    * @param questId ID of the Quest
+    * @param distributor Address of the Distributor handling the Quest rewards
+    * @param period Timestamp of the period
+    * @return Allocation : Quest Allocation for the period
+    */
     function _getQuestAllocationForPeriod(
         address gauge,
         uint256 questId,
@@ -292,7 +413,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     ) internal view returns(Allocation memory) {
         address board = MultiMerkleDistributorV2(distributor).questBoard();
         uint256 nbQuestForGauge = IQuestBoard(board).getQuestIdsForPeriodForGauge(gauge, period).length;
-        uint256 questTotalRewards = totalQuestPeriodRewards[questId][period];
+        uint256 questTotalRewards = totalQuestPeriodRewards[distributor][questId][period];
 
         if(nbQuestForGauge == 0 || questTotalRewards == 0) return Allocation(0, 0);
 
@@ -313,6 +434,9 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         return allocation;
     }
 
+    /**
+    * @dev Updates the current period budget & uses the pending budget
+    */
     function _updatePeriod() internal {
         if(block.timestamp < nextBudgetUpdatePeriod) return;
 
@@ -336,6 +460,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         nextBudgetUpdatePeriod += WEEK;
     }
 
+    /**
+    * @dev Creates a Loot based on the user claimed Quest rewards and its hPalPower adjusted balance
+    * @param user Address of the user
+    * @param distributor Address of the Distributor handling the Quest rewards
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    */
     function _createLoot(address user, address distributor, uint256 questId, uint256 period) internal {
         CreateVars memory vars;
         if(!allowedDistributors[distributor]) return;
@@ -355,7 +486,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // Calculate ratios based on that
         vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
-        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[questId][period];
+        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[distributor][questId][period];
         if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
 
         vars.userMultiplier = (vars.totalRatio * MAX_MULTIPLIER) / UNIT;
@@ -384,6 +515,11 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // Admin functions
 
+    /**
+    * @notice Adds a Distributor to the list
+    * @dev Adds a new Distributor allowed to interact with this contract
+    * @param distributor Address of the Distributor
+    */
     function addDistributor(address distributor) external onlyOwner {
         if(distributor == address(0)) revert Errors.AddressZero();
         if(allowedDistributors[distributor]) revert Errors.AlreadyListed();
@@ -394,6 +530,11 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         emit NewDistributorListed(distributor);
     }
 
+    /**
+    * @notice Removes a Distributor from the list
+    * @dev Removes a Distributor allowed to interact with this contract
+    * @param distributor Address of the Distributor
+    */
     function removeDistributor(address distributor) external onlyOwner {
         if(distributor == address(0)) revert Errors.AddressZero();
         if(!allowedDistributors[distributor]) revert Errors.NotListed();
@@ -417,6 +558,11 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         emit DistributorUnlisted(distributor);
     }
 
+    /**
+    * @notice Updates the Loot Gauge/Budget address
+    * @dev Updates the Loot Gauge/Budget address
+    * @param newGauge Address of the new Loot Gauge/Budget contract
+    */
     function updateLootGauge(address newGauge) external onlyOwner {
         if(newGauge == address(0)) revert Errors.AddressZero();
         if(lootGauge == newGauge) revert Errors.SameAddress();

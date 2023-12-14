@@ -6,7 +6,7 @@
 """
 
 
-interface HolyPalPower: # HolyPalPower
+interface HolyPalPower:
     def balanceOf(_user: address) -> uint256: view
     def balanceOfAt(_user: address, _timestamp: uint256) -> uint256: view
 
@@ -89,12 +89,21 @@ def adjusted_balance_of_at(_account: address, _ts: uint256) -> uint256:
 @view
 @external
 def total_locked() -> uint256:
+    """
+    @notice Get the total hPAL locked
+    @return Ttoal hPAL locked
+    """
     return HolyPalPower(HOLY_PAL_POWER).totalLocked()
 
 
 @view
 @external
 def total_locked_at(_blockNumber: uint256) -> uint256:
+    """
+    @notice Get the total hPAL locked at a given block
+    @param _blockNumber Number fo the block to look at
+    @return Ttoal hPAL locked
+    """
     return HolyPalPower(HOLY_PAL_POWER).totalLockedAt(_blockNumber)
 
 

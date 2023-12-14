@@ -19,7 +19,8 @@ import "./libraries/Errors.sol";
 /** @title Loot Budget contract */
 /// @author Paladin
 /*
-    TODO: Add comments
+    Contract holding the PAL & extra token budget for the Loot system
+    and managing the preiodical allocation to the LootReserve
 */
 
 contract LootBudget is Owner, ReentrancyGuard {
@@ -33,22 +34,32 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // Storage
 
+    /** @notice Address of the PAL token */
     address immutable public pal;
+    /** @notice Address of the extra token */
     address immutable public extraToken;
     
+    /** @notice Address of the Loot Creator contract */
     address immutable public lootCreator;
+    /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
 
+    /** @notice Amount of PAL allocated weekly */
     uint256 public palWeeklyBudget;
+    /** @notice Amount of extra token allocated weekly */
     uint256 public extraWeeklyBudget;
 
+    /** @notice Flag set if the period's budget was already claimed */
     mapping(uint256 => bool) public periodBudgetClaimed;
 
 
     // Events
 
+    /** @notice Event emitted when the PAL weekly budget is updated */
     event PalWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
+    /** @notice Event emitted when when the extra token weekly budget is updated */
     event ExtraWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
+    /** @notice Event emitted when the Reserve is canceled and token claimed back */
     event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
 
 
@@ -73,6 +84,10 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // State-changing functions
 
+    /**
+    * @notice Update the period budget
+    * @dev Send the period budget to the LootReserve (PAL & extra token if set)
+    */
     function updateLootBudget() external nonReentrant {
         uint256 currentPeriod = (block.timestamp / WEEK) * WEEK;
         uint256 palAmount = palWeeklyBudget;
@@ -95,6 +110,11 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // Admin functions
 
+    /**
+    * @notice Updates the PAL weekly budget
+    * @dev Updates the PAL weekly budget
+    * @param newBudget new weekly budget amount
+    */
     function updatePalWeeklyBudget(uint256 newBudget) external onlyOwner() {
         uint256 oldBudget = palWeeklyBudget;
         palWeeklyBudget = newBudget;
@@ -102,6 +122,11 @@ contract LootBudget is Owner, ReentrancyGuard {
         emit PalWeeklyBudgetUpdated(oldBudget, newBudget);
     }
 
+    /**
+    * @notice Updates the extra token weekly budget
+    * @dev Updates the extra token weekly budget
+    * @param newBudget new weekly budget amount
+    */
     function updateExtraWeeklyBudget(uint256 newBudget) external onlyOwner() {
         uint256 oldBudget = extraWeeklyBudget;
         extraWeeklyBudget = newBudget;
@@ -109,6 +134,10 @@ contract LootBudget is Owner, ReentrancyGuard {
         emit ExtraWeeklyBudgetUpdated(oldBudget, newBudget);
     }
 
+    /**
+    * @notice Empty this contract and send all tokens to the owner
+    * @dev Empty this contract and send all tokens to the owner
+    */
     function emptyReserve() external onlyOwner {
         uint256 palBalance = IERC20(pal).balanceOf(address(this));
         uint256 extraBalance = IERC20(extraToken).balanceOf(address(this));

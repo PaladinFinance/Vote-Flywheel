@@ -70,7 +70,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
     // Events
 
-    /** @notice Event emitted when an user Claims */
+    /** @notice Event emitted when a user Claims */
     event Claimed(
         uint256 indexed questID,
         uint256 indexed period,
@@ -107,8 +107,8 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
     // Functions
    
     /**
-    * @notice Checks if the rewards were claimed for an user on a given period
-    * @dev Checks if the rewards were claimed for an user (based on the index) on a given period
+    * @notice Checks if the rewards were claimed for a user on a given period
+    * @dev Checks if the rewards were claimed for a user (based on the index) on a given period
     * @param questID ID of the Quest
     * @param period Amount of underlying to borrow
     * @param index Index of the claim
@@ -136,8 +136,8 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
     //Basic Claim   
     /**
-    * @notice Claims the reward for an user for a given period of a Quest
-    * @dev Claims the reward for an user for a given period of a Quest if the correct proof was given
+    * @notice Claims the reward for a user for a given period of a Quest
+    * @dev Claims the reward for a user for a given period of a Quest if the correct proof was given
     * @param questID ID of the Quest
     * @param period Timestamp of the period
     * @param index Index in the Merkle Tree
