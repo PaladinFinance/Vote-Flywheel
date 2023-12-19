@@ -367,7 +367,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @notice Updates the period
     * @dev Updates the period by pulling the new budget and updating the current period budget
     */
-    function updatePeriod() external {
+    function updatePeriod() external nonReentrant {
         _pullBudget();
         _updatePeriod();
     }
