@@ -16,6 +16,8 @@ contract Owner is Ownable {
 
     event NewPendingOwner(address indexed previousPendingOwner, address indexed newPendingOwner);
 
+    constructor() Ownable(msg.sender) {}
+
     function transferOwnership(address newOwner) public override virtual onlyOwner {
         if(newOwner == address(0)) revert Errors.AddressZero();
         if(newOwner == owner()) revert Errors.CannotBeOwner();

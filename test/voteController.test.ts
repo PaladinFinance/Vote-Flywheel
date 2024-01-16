@@ -226,14 +226,14 @@ describe('LootVoteController contract tests', () => {
                     board1.address,
                     distributor1.address,
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).addNewBoard(
                     board1.address,
                     distributor1.address,
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     
@@ -331,14 +331,14 @@ describe('LootVoteController contract tests', () => {
                     board1.address,
                     newDistributor.address,
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).updateDistributor(
                     board1.address,
                     newDistributor.address,
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     
@@ -653,7 +653,7 @@ describe('LootVoteController contract tests', () => {
                     board1_id,
                     0
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).addNewGauge(
@@ -661,7 +661,7 @@ describe('LootVoteController contract tests', () => {
                     board1_id,
                     0
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     
@@ -783,14 +783,14 @@ describe('LootVoteController contract tests', () => {
                     gauge1.address,
                     new_gauge1_cap
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).updateGaugeCap(
                     gauge1.address,
                     new_gauge1_cap
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     
@@ -875,13 +875,13 @@ describe('LootVoteController contract tests', () => {
                 controller.connect(user1).killGauge(
                     gauge1.address
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).killGauge(
                     gauge1.address
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     
@@ -966,13 +966,13 @@ describe('LootVoteController contract tests', () => {
                 controller.connect(user1).unkillGauge(
                     gauge1.address
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
 
             await expect(
                 controller.connect(gauge1).unkillGauge(
                     gauge1.address
                 )
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
         });
     

@@ -1637,7 +1637,7 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
 
             await expect(
                 distributor.connect(user2).emergencyUpdateQuestPeriod(quest_id1, period, 0, new_tree_root)
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user2.address + '")')
 
         });
 
@@ -1681,7 +1681,7 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
 
             await expect(
                 distributor.connect(user2).recoverERC20(DAI.address)
-            ).to.be.revertedWith('Ownable: caller is not the owner')
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user2.address + '")')
 
         });
 

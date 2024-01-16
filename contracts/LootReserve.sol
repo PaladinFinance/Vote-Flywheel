@@ -64,8 +64,8 @@ contract LootReserve is Owner {
         if(loot != address(0)) revert Errors.CreatorAlreadySet();
         loot = _loot;
 
-        pal.safeApprove(_loot, type(uint256).max);
-        extraToken.safeApprove(_loot, type(uint256).max);
+        pal.safeIncreaseAllowance(_loot, type(uint256).max);
+        extraToken.safeIncreaseAllowance(_loot, type(uint256).max);
 
         emit MaxAllowanceSet(address(pal), _loot);
         emit MaxAllowanceSet(address(extraToken), _loot);

@@ -16,7 +16,7 @@ import {IQuestBoard} from "./interfaces/IQuestBoard.sol";
 import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
 import {Loot} from "./Loot.sol";
 import {MultiMerkleDistributorV2} from "./MultiMerkleDistributorV2.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./utils/Owner.sol";
 import "./libraries/Errors.sol";
 
