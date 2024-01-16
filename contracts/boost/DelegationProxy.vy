@@ -16,6 +16,7 @@ interface HolyPalPower:
 
 interface VeDelegation: # Boost V2
     def adjusted_balance_of(_account: address) -> uint256: view
+    def adjusted_balance_of_write(_account: address) -> uint256: nonpayable
     def adjusted_balance_of_at(_account: address, _ts: uint256) -> uint256: view
 
     def total_locked() -> uint256: view
@@ -69,6 +70,18 @@ def adjusted_balance_of(_account: address) -> uint256:
     if _delegation == ZERO_ADDRESS:
         return HolyPalPower(HOLY_PAL_POWER).balanceOf(_account)
     return VeDelegation(_delegation).adjusted_balance_of(_account)
+
+@external
+def adjusted_balance_of_write(_account: address) -> uint256:
+    """
+    @notice Get the adjusted hPalPower balance from the active boost delegation contract
+    @param _account The account to query the adjusted hPalPower balance of
+    @return hPalPower balance
+    """
+    _delegation: address = self.delegation
+    if _delegation == ZERO_ADDRESS:
+        return HolyPalPower(HOLY_PAL_POWER).balanceOf(_account)
+    return VeDelegation(_delegation).adjusted_balance_of_write(_account)
 
 
 @view

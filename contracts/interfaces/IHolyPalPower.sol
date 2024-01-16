@@ -28,4 +28,8 @@ interface IHolyPalPower {
 
     function totalSupply() external view returns(uint256);
 
+    function totalLocked() external view returns(uint256);
+
+    function totalLockedAt(uint256 blockNumber) external view returns(uint256);
+
 }

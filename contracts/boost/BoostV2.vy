@@ -411,6 +411,21 @@ def adjusted_balance_of(_user: address) -> uint256:
     return self._balance_of(_user)
 
 
+@external
+def adjusted_balance_of_write(_user: address) -> uint256:
+    delegated_nonce: uint256 = self.delegated_checkpoints_nonces[_user]
+    self.delegated[_user][delegated_nonce] = self._checkpoint_write(_user, True)
+    self.delegated_checkpoints_dates[_user][delegated_nonce] = block.timestamp
+    self.delegated_checkpoints_nonces[_user] = delegated_nonce + 1
+    
+    received_nonce: uint256 = self.received_checkpoints_nonces[_user]
+    self.received[_user][received_nonce] = self._checkpoint_write(_user, False)
+    self.received_checkpoints_dates[_user][received_nonce] = block.timestamp
+    self.received_checkpoints_nonces[_user] = received_nonce + 1
+
+    return self._balance_of(_user)
+
+
 @view
 @external
 def balanceOfAt(_user: address, _ts: uint256) -> uint256:
