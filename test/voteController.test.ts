@@ -3757,7 +3757,7 @@ describe('LootVoteController contract tests', () => {
             
             await expect(
                 controller.connect(proxyVoter2).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
-            ).to.be.revertedWith('NotAllowedManager')
+            ).to.be.revertedWith('NotAllowedProxyVoter')
 
         });
 
@@ -3771,8 +3771,8 @@ describe('LootVoteController contract tests', () => {
             await advanceTime(WEEK.mul(7).toNumber())
             
             await expect(
-                controller.connect(proxyVoter2).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
-            ).to.be.revertedWith('NotAllowedManager')
+                controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
+            ).to.be.revertedWith('ExpiredProxy')
 
         });
 
@@ -4555,7 +4555,7 @@ describe('LootVoteController contract tests', () => {
             
             await expect(
                 controller.connect(proxyVoter2).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [2000, 2500])
-            ).to.be.revertedWith('NotAllowedManager')
+            ).to.be.revertedWith('NotAllowedProxyVoter')
 
         });
 

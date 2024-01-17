@@ -130,9 +130,9 @@ contract HolyPalPower is IHolyPalPower {
     }
 
     /**
-    * @notice Returns the total hPAL supply
-    * @dev Returns the total hPAL supply
-    * @return uint256 : Total hPAL supply
+    * @notice Returns the total hPALPower supply
+    * @dev Returns the total hPALPower supply
+    * @return uint256 : Total hPALPower supply
     */
     function totalSupply() external view returns(uint256) {
         return IHolyPaladinToken(hPal).getCurrentTotalLock().total;

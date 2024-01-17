@@ -71,7 +71,7 @@ contract Loot is Owner, ReentrancyGuard {
     event LootClaimed(address indexed user, uint256 indexed id, uint256 palAmount, uint256 extraAmount);
 
     /** @notice Event emitted when the vesting duration is updated */
-    event VestingDurationUpdated(uint256 newDuration);
+    event VestingDurationUpdated(uint256 oldDuration, uint256 newDuration);
     /** @notice Event emitted when the Loot Creator address is updated */
     event LootCreatorUpdated(address oldCreator, address newCreator);
 
@@ -345,9 +345,10 @@ contract Loot is Owner, ReentrancyGuard {
     function updateVestingDuration(uint256 _vestingDuration) external onlyOwner {
         if(_vestingDuration < 1 weeks) revert Errors.InvalidParameter();
 
+        uint256 oldDuration = vestingDuration;
         vestingDuration = _vestingDuration;
 
-        emit VestingDurationUpdated(_vestingDuration);
+        emit VestingDurationUpdated(oldDuration, _vestingDuration);
     }
 
     /**

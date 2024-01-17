@@ -1444,7 +1444,100 @@ describe('LootCreator contract tests', () => {
 
         it(' should distribute all the rewards of the period if all users have max boost', async () => {
 
-            
+            const claim_amount2 = claim_amount.mul(2)
+            const claim_amount3 = total_rewards.sub(claim_amount).sub(claim_amount2)
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user2.address,
+                quest_id,
+                period,
+                claim_amount2
+            )
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user3.address,
+                quest_id,
+                period,
+                claim_amount3
+            )
+
+            await power.connect(admin).setAdjustedBalanceAt(user1.address, period, user_power_over)
+            await power.connect(admin).setAdjustedBalanceAt(user2.address, period, user_power_over.mul(2))
+            await power.connect(admin).setAdjustedBalanceAt(user3.address, period, user_power_over)
+
+            const gauge_allocation = await creator.getGaugeBudgetForPeriod(questGauge1.address, period)
+            const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
+
+            const prev_pending_budget = await creator.pengingBudget()
+
+            const expected_pal_amount1 = quest_allocation.palPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount).div(UNIT)
+            const expected_extra_amount1 = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount).div(UNIT)
+
+            const expected_pal_amount2 = quest_allocation.palPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount2).div(UNIT)
+            const expected_extra_amount2 = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount2).div(UNIT)
+
+            const expected_pal_amount3 = quest_allocation.palPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount3).div(UNIT)
+            const expected_extra_amount3 = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount3).div(UNIT)
+
+            const tx = await creator.connect(user1).createLoot(
+                user1.address,
+                distributor.address,
+                quest_id,
+                period,
+            )
+
+            const tx2 = await creator.connect(user2).createLoot(
+                user2.address,
+                distributor.address,
+                quest_id,
+                period,
+            )
+
+            const tx3 = await creator.connect(user3).createLoot(
+                user3.address,
+                distributor.address,
+                quest_id,
+                period,
+            )
+
+            const new_user1_loots = await loot.getAllUserLoot(user1.address)
+            const loot_id1 = new_user1_loots[new_user1_loots.length - 1].id
+            const new_loot1 = await loot.userLoots(user1.address, loot_id1)
+
+            expect(new_loot1.id).to.be.eq(loot_id1)
+            expect(new_loot1.palAmount).to.be.eq(expected_pal_amount1)
+            expect(new_loot1.extraAmount).to.be.eq(expected_extra_amount1)
+            expect(new_loot1.startTs).to.be.eq(period.add(WEEK))
+            expect(new_loot1.claimed).to.be.false
+
+            const new_user2_loots = await loot.getAllUserLoot(user2.address)
+            const loot_id2 = new_user2_loots[new_user2_loots.length - 1].id
+            const new_loot2 = await loot.userLoots(user2.address, loot_id2)
+
+            expect(new_loot2.id).to.be.eq(loot_id2)
+            expect(new_loot2.palAmount).to.be.eq(expected_pal_amount2)
+            expect(new_loot2.extraAmount).to.be.eq(expected_extra_amount2)
+            expect(new_loot2.startTs).to.be.eq(period.add(WEEK))
+            expect(new_loot2.claimed).to.be.false
+
+            const new_user3_loots = await loot.getAllUserLoot(user3.address)
+            const loot_id3 = new_user3_loots[new_user3_loots.length - 1].id
+            const new_loot3 = await loot.userLoots(user3.address, loot_id3)
+
+            expect(new_loot3.id).to.be.eq(loot_id3)
+            expect(new_loot3.palAmount).to.be.eq(expected_pal_amount3)
+            expect(new_loot3.extraAmount).to.be.eq(expected_extra_amount3)
+            expect(new_loot3.startTs).to.be.eq(period.add(WEEK))
+            expect(new_loot3.claimed).to.be.false
+
+            expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id1, expected_pal_amount1, expected_extra_amount1, period.add(WEEK))
+            expect(tx2).to.emit(loot, 'LootCreated').withArgs(user2.address, loot_id2, expected_pal_amount2, expected_extra_amount2, period.add(WEEK))
+            expect(tx3).to.emit(loot, 'LootCreated').withArgs(user3.address, loot_id3, expected_pal_amount3, expected_extra_amount3, period.add(WEEK))
+
+            expect(gauge_allocation.palAmount).to.be.eq(expected_pal_amount1.add(expected_pal_amount2).add(expected_pal_amount3))
+            expect(gauge_allocation.extraAmount).to.be.eq(expected_extra_amount1.add(expected_extra_amount2).add(expected_extra_amount3))
 
         });
 

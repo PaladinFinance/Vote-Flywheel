@@ -328,7 +328,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     */
     function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external nonReentrant {
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
-        if(proxyState.maxPower == 0) revert Errors.NotAllowedManager();
+        if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
         if(userPower > proxyState.maxPower) revert Errors.VotingPowerProxyExceeded();
 
@@ -344,7 +344,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     */
     function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external nonReentrant {
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
-        if(proxyState.maxPower == 0) revert Errors.NotAllowedManager();
+        if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
         uint256 totalPower;
 

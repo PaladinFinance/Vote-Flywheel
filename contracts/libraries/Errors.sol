@@ -46,6 +46,7 @@ library Errors {
     error KilledGauge();
     error NotKilledGauge();
     error NotAllowedManager();
+    error NotAllowedProxyVoter();
     error ExpiredProxy();
     error ProxyAlreadyActive();
     error ProxyPowerExceeded();

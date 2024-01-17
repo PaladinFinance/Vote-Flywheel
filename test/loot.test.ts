@@ -809,7 +809,7 @@ describe('Loot contract tests', () => {
 
             expect(await loot.vestingDuration()).to.be.eq(new_vesting_duration)
             
-            expect(tx).to.emit(loot, 'VestingDurationUpdated').withArgs(new_vesting_duration)
+            expect(tx).to.emit(loot, 'VestingDurationUpdated').withArgs(vesting_duration, new_vesting_duration)
 
         });
 

@@ -245,15 +245,6 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         _createLoot(user, distributor, questId, period);
     }
 
-    struct MultiCreate {
-        // Address of the Distributor handling the Quest rewards
-        address distributor;
-        // ID of the Quest
-        uint256 questId;
-        // Timestamp of the period
-        uint256 period;
-    }
-
     /**
     * @notice Creates multiple Loots for a user
     * @dev Creates multiple Loots for a user based on the Quest rewards for each period
