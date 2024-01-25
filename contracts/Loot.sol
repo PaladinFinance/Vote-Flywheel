@@ -281,7 +281,9 @@ contract Loot is Owner, ReentrancyGuard {
 
         // Transfer the PAL & extra token to the receiver
         pal.safeTransferFrom(tokenReserve, receiver, palAmount);
-        extraToken.safeTransferFrom(tokenReserve, receiver, loot.extraAmount);
+        if(loot.extraAmount > 0) {
+            extraToken.safeTransferFrom(tokenReserve, receiver, loot.extraAmount);
+        }
 
         emit LootClaimed(msg.sender, id, palAmount, loot.extraAmount);
     }
@@ -331,7 +333,9 @@ contract Loot is Owner, ReentrancyGuard {
 
         // Transfer the PAL & extra token to the receiver
         pal.safeTransferFrom(tokenReserve, receiver, totalPalAmount);
-        extraToken.safeTransferFrom(tokenReserve, receiver, totalExtraAmount);
+        if(totalExtraAmount > 0) {
+            extraToken.safeTransferFrom(tokenReserve, receiver, totalExtraAmount);
+        }
     }
 
 
