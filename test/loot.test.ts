@@ -262,6 +262,20 @@ describe('Loot contract tests', () => {
 
         });
 
+        it(' should not create a Loot if bot hamoutns are 0', async () => {
+
+            const prev_user_loot_length = (await loot.getAllUserLoot(user1.address)).length
+
+            const tx = await creator.connect(admin).createLoot(user1.address, start_ts, 0, 0)
+
+            const new_user_loots = await loot.getAllUserLoot(user1.address)
+
+            expect(new_user_loots.length).to.be.eq(prev_user_loot_length)
+
+            expect(tx).not.to.emit(loot, 'LootCreated')
+
+        });
+
         it(' should only be allowed for the Loot Creator', async () => {
 
             await expect(

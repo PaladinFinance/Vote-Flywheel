@@ -1671,7 +1671,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).updatePeriod()
 
-            await board.connect(admin).addQuestIdForGaugePerPeriod(period, questGauge1.address, [quest_id])
+            await board.connect(admin).addQuestIdForGaugePerPeriod(period3, questGauge1.address, [quest_id])
 
             await controller.connect(admin).setGaugeWeightAt(questGauge1.address, period3, gauge_weight3)
 
@@ -1821,8 +1821,8 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id3, expected_pal_amount3, expected_extra_amount3, period3.add(WEEK))
             
-            const undistributed_pal3 = quest_allocation3.palPerVote.mul(MAX_MULTIPLIER.sub(expected_pal_amount3)).div(UNIT).mul(claim_amount3).div(UNIT)
-            const undistributed_extra3 = quest_allocation3.extraPerVote.mul(MAX_MULTIPLIER.sub(expected_pal_amount3)).div(UNIT).mul(claim_amount3).div(UNIT)
+            const undistributed_pal3 = quest_allocation3.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier3)).div(UNIT).mul(claim_amount3).div(UNIT)
+            const undistributed_extra3 = quest_allocation3.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier3)).div(UNIT).mul(claim_amount3).div(UNIT)
 
 
             // general 2

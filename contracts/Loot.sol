@@ -236,6 +236,8 @@ contract Loot is Owner, ReentrancyGuard {
     * @param extraAmount Amount of extra token
     */
     function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external nonReentrant onlyLootCreator {
+        if(palAmount == 0 && extraAmount == 0) return;
+
         uint256 lootId = userLoots[user].length;
 
         // Write the Loot parameters based on inputs
@@ -266,22 +268,26 @@ contract Loot is Owner, ReentrancyGuard {
         if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
         loot.claimed = true;
 
-        // Check if the Loot is still vesting, and slash the PAL amount if needed
+        
+
         uint256 palAmount = loot.palAmount;
-        uint256 vestingEndTs = loot.startTs + vestingDuration;
-        if(block.timestamp < vestingEndTs){
-            uint256 remainingVesting = vestingEndTs - block.timestamp;
-            uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
+        if(palAmount > 0) {
+            // Check if the Loot is still vesting, and slash the PAL amount if needed
+            uint256 vestingEndTs = loot.startTs + vestingDuration;
+            if(block.timestamp < vestingEndTs){
+                uint256 remainingVesting = vestingEndTs - block.timestamp;
+                uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
-            // Notify the LootCreator of the slashed amount
-            lootCreator.notifyUndistributedRewards(slashingAmount);
+                // Notify the LootCreator of the slashed amount
+                lootCreator.notifyUndistributedRewards(slashingAmount);
 
-            palAmount -= slashingAmount;
+                palAmount -= slashingAmount;
+            }
+            // Transfer the PAL to the receiver
+            pal.safeTransferFrom(tokenReserve, receiver, palAmount);
         }
-
-        // Transfer the PAL & extra token to the receiver
-        pal.safeTransferFrom(tokenReserve, receiver, palAmount);
         if(loot.extraAmount > 0) {
+        // Transfer the extra token to the receiver
             extraToken.safeTransferFrom(tokenReserve, receiver, loot.extraAmount);
         }
 
@@ -311,15 +317,17 @@ contract Loot is Owner, ReentrancyGuard {
 
             // Check if the Loot is still vesting, and slash the PAL amount if needed
             uint256 palAmount = loot.palAmount;
-            uint256 vestingEndTs = loot.startTs + vestingDuration;
-            if(block.timestamp < vestingEndTs){
-                uint256 remainingVesting = vestingEndTs - block.timestamp;
-                uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
+            if(palAmount > 0) {
+                uint256 vestingEndTs = loot.startTs + vestingDuration;
+                if(block.timestamp < vestingEndTs){
+                    uint256 remainingVesting = vestingEndTs - block.timestamp;
+                    uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
-                // Notify the LootCreator of the slashed amount
-                lootCreator.notifyUndistributedRewards(slashingAmount);
+                    // Notify the LootCreator of the slashed amount
+                    lootCreator.notifyUndistributedRewards(slashingAmount);
 
-                palAmount -= slashingAmount;
+                    palAmount -= slashingAmount;
+                }
             }
 
             // Sum up all the PAL & extra token to be transferred
@@ -332,7 +340,9 @@ contract Loot is Owner, ReentrancyGuard {
         }
 
         // Transfer the PAL & extra token to the receiver
-        pal.safeTransferFrom(tokenReserve, receiver, totalPalAmount);
+        if(totalPalAmount > 0) {
+            pal.safeTransferFrom(tokenReserve, receiver, totalPalAmount);
+        }
         if(totalExtraAmount > 0) {
             extraToken.safeTransferFrom(tokenReserve, receiver, totalExtraAmount);
         }
