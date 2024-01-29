@@ -1,9 +1,9 @@
 import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { HolyPalPower } from "./../typechain/contracts/HolyPalPower";
-import { IHolyPaladinToken } from "./../typechain/contracts/interfaces/IHolyPaladinToken";
-import { IHolyPaladinToken__factory } from "./../typechain/factories/contracts/interfaces/IHolyPaladinToken__factory";
+import { HolyPalPower } from "../typechain/contracts/HolyPalPower";
+import { IHolyPaladinToken } from "../typechain/contracts/interfaces/IHolyPaladinToken";
+import { IHolyPaladinToken__factory } from "../typechain/factories/contracts/interfaces/IHolyPaladinToken__factory";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber } from "@ethersproject/bignumber";
@@ -38,7 +38,7 @@ describe('HolyPalPower contract tests', () => {
 
     const before_initial_lock_ts = BigNumber.from('1651745000')
 
-    const ts_1 = BigNumber.from('1653755700')
+    const ts_1 = BigNumber.from('1654755700')
     const ts_2 = BigNumber.from('1686236000')
     const ts_3 = BigNumber.from('1690356000')
 

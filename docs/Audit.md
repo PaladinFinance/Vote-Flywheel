@@ -8,7 +8,7 @@ For Overview of the codebase and installation instructions, see README.md
 
 |File|SLOC|Coverage|
 |:-|:-:|:-:|
-|HolyPalPower.sol | 211 | 93.33% |
+|HolyPalPower.sol | 211 | 94.305% |
 |Loot.sol | 309 | 95.3125% |
 |LootBudget.sol | 116 | 76.9975% |
 |LootCreator.sol | 463 | 89.6% |
