@@ -118,6 +118,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     // Events
 
+    /** @notice Event emitted when the contract is initialized */
+    event Init(address lootGauge);
     /** @notice Event emitted when a new Distributor is listed */
     event NewDistributorListed(address indexed distributor);
     /** @notice Event emitted when Distributor is unlisted */
@@ -171,6 +173,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         if(lootGauge != address(0)) revert Errors.AlreadyInitialized();
 
         lootGauge = _lootGauge;
+
+        emit Init(_lootGauge);
     }
 
 
