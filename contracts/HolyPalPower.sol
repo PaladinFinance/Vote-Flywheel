@@ -217,7 +217,7 @@ contract HolyPalPower is IHolyPalPower {
         uint256 mid;
 
         while (low < high) {
-            mid = Math.average(low, high);
+            mid = avg(low, high);
             IHolyPaladinToken.UserLock memory midLock = _hPal.userLocks(user, mid);
             if (midLock.fromBlock == targetBlockNumber) {
                 return midLock;
@@ -251,6 +251,14 @@ contract HolyPalPower is IHolyPalPower {
     function convertUint128ToInt128(uint128 value) internal pure returns(int128) {
         if (value > uint128(type(int128).max)) revert Errors.ConversionOverflow();
         return int128(value);
+    }
+
+    // Taken from Solady FixedPointMathLib.sol
+    /// @dev Returns the average of `x` and `y`.
+    function avg(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        unchecked {
+            z = (x & y) + ((x ^ y) >> 1);
+        }
     }
 
 }
