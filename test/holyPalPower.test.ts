@@ -38,7 +38,7 @@ describe('HolyPalPower contract tests', () => {
 
     const before_initial_lock_ts = BigNumber.from('1651745000')
 
-    const ts_1 = BigNumber.from('1651755700')
+    const ts_1 = BigNumber.from('1653755700')
     const ts_2 = BigNumber.from('1686236000')
     const ts_3 = BigNumber.from('1690356000')
 
@@ -232,7 +232,7 @@ describe('HolyPalPower contract tests', () => {
 
         it(' should return the correct point - user 1 - 1st ts', async () => {
 
-            const expected_lock_number = BigNumber.from('0')
+            const expected_lock_number = BigNumber.from('1')
 
             const expected_lock = await hPal.userLocks(TEST_USER, expected_lock_number)
 
@@ -391,7 +391,7 @@ describe('HolyPalPower contract tests', () => {
 
         it(' should return the correct point - user 3 - 1st ts', async () => {
 
-            const expected_lock_number = BigNumber.from('0')
+            const expected_lock_number = BigNumber.from('1')
 
             const expected_lock = await hPal.userLocks(TEST_USER_3, expected_lock_number)
 
@@ -458,7 +458,7 @@ describe('HolyPalPower contract tests', () => {
 
         it(' should return the correct point - user 1 - 1st ts', async () => {
 
-            const expected_lock_number = BigNumber.from('0')
+            const expected_lock_number = BigNumber.from('1')
 
             const expected_lock = await hPal.userLocks(TEST_USER, expected_lock_number)
 
@@ -581,7 +581,7 @@ describe('HolyPalPower contract tests', () => {
 
         it(' should return the correct point - user 3 - 1st ts', async () => {
 
-            const expected_lock_number = BigNumber.from('0')
+            const expected_lock_number = BigNumber.from('1')
 
             const expected_lock = await hPal.userLocks(TEST_USER_3, expected_lock_number)
 

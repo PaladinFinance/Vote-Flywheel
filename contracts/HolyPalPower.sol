@@ -30,9 +30,9 @@ contract HolyPalPower is IHolyPalPower {
     uint256 private constant WEEK = 604800;
     
     /** @notice Anchor block used to approximate past block number calculations */
-    uint256 private constant ANCHOR_BLOCK = 14709709;
+    uint256 private constant ANCHOR_BLOCK = 15537450;
     /** @notice Anchor timestamp used to approximate past block number calculations */
-    uint256 private constant ANCHOR_TIMESTAMP = 1651650836;
+    uint256 private constant ANCHOR_TIMESTAMP = 1663224863;
 
     /** @notice Scale unit used for past block number calculations */
     uint256 private constant SCALE_UNIT = 1000000000;
