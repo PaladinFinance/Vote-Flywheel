@@ -7,12 +7,12 @@ Vote Flywheel smart contracts
 ## Overview
 
 Vote Flywheel is the 2nd part of the Paladin tokenomics, built upon Quest V2.  
-This system allcoates PAL & an extra reward token, bundled as LOOT, to be distributed to Quest voters as extra rewards.  
-hPAL locks are the based voting power used in Vote Flywheel, and the Locks are converted into a decreasing balance called HolyPalPower (similar to a veToken), allowing to vote on LOOT allocation & boosting LOOT claim for voters.  
+This system allcoates PAL & an extra reward token, bundled as Loot, to be distributed to Quest voters as extra rewards.  
+hPAL locks are the based voting power used in Vote Flywheel, and the Locks are converted into a decreasing balance called HolyPalPower (similar to a veToken), allowing to vote on Loot allocation & boosting Loot claim for voters.  
 The PAL & extra token are distributed into the system each week (via the LootBudget contract), and is allocated between gauge listed in the LootVoteController contract (gauges listed come from the Curve, Balancer, Bunni, ... ecosystems, having Quests created for voting incentives). The allocation is split based on the votes received on each gauge, and divided for each Quest if the gauge has multiple Quests for the same period.  
-The Loot is then distributed to users based on their amount of rewards from Quests, and boosted based on the hPalPower of the user. The LOOT need to be created by the user, and can be claimed any time, but need to be vest for 2 weeks to receive the full PAL amount.  
+The Loot is then distributed to users based on their amount of rewards from Quests, and boosted based on the hPalPower of the user. The Loot need to be created by the user, and can be claimed any time, but need to be vest for a given time to receive the full PAL amount.  
 The HPalPower boosting can be delegated using the veBoost logic.  
-Each week, all budget that was not allocated (because no Quests were created on the gauge, or the gauge cap over exceeded, or the users didn't have enough boosting power to receive all rewards, or PAL was slashed from the LOOT vesting) is pushed back into the pending budget for future period, increasing the amount to allocate.  
+Each week, all budget that was not allocated (because no Quests were created on the gauge, or the gauge cap over exceeded, or the users didn't have enough boosting power to receive all rewards, or PAL was slashed from the Loot vesting) is pushed back into the pending budget for future period, increasing the amount to allocate.  
 
 
 ![Diagram](misc/Vote_Flywheel_diagram.png?raw=true "Diagram")
