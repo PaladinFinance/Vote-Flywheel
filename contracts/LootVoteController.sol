@@ -183,6 +183,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     /** @notice Event emitted when a Proxy Manager is set */
     event SetProxyManager(address indexed user, address indexed manager);
+    /** @notice Event emitted when a Proxy Manager is removed */
+    event RemoveProxyManager(address indexed user, address indexed manager);
     /** @notice Event emitted when a Proxy Voter is set */
     event SetNewProxyVoter(address indexed user, address indexed proxyVoter, uint256 maxPower, uint256 endTimestamp);
 
@@ -412,6 +414,19 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         isProxyManager[msg.sender][manager] = true;
 
         emit SetProxyManager(msg.sender, manager);
+    }
+
+    /**
+    * @notice Approves a Proxy Manager for the caller
+    * @dev Approves a Proxy Manager for the caller allowed to create Proxy on his voting power
+    * @param manager Address of the Proxy Manager
+    */
+    function removeProxyManager(address manager) external {
+        if(manager == address(0)) revert Errors.AddressZero();
+
+        isProxyManager[msg.sender][manager] = false;
+
+        emit RemoveProxyManager(msg.sender, manager);
     }
 
     /**

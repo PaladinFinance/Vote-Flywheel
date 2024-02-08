@@ -3058,6 +3058,36 @@ describe('LootVoteController contract tests', () => {
     
     });
 
+    describe('removeProxyManager', async () => {
+
+        beforeEach(async () => {
+
+            await controller.connect(user1).approveProxyManager(manager.address)
+
+        });
+
+        it(' should remove the proxy manager correctly', async () => {
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            const tx = await controller.connect(user1).removeProxyManager(manager.address)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
+
+            await expect(tx).to.emit(controller, 'RemoveProxyManager').withArgs(user1.address, manager.address)
+
+        });
+
+        it(' should fail if given address 0x0', async () => {
+
+            await expect(
+                controller.connect(user1).removeProxyManager(ethers.constants.AddressZero)
+            ).to.be.revertedWith('AddressZero')
+
+        });
+    
+    });
+
     describe('setVoterProxy', async () => {
 
         let board1_id: BigNumber
