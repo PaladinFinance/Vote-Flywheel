@@ -40,6 +40,9 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     /** @notice Cooldown between 2 votes */
     uint256 private constant VOTE_COOLDOWN = 864000; // 10 days
 
+    /** @notice Max number of votes an user can vote at once */
+    uint256 private constant MAX_VOTE_LENGTH = 10;
+
 
     // Structs
 
@@ -317,6 +320,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     */
     function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external nonReentrant {
         uint256 length = gauge.length;
+        if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
         for(uint256 i; i < length; i++) {
             _voteForGauge(msg.sender, gauge[i], userPower[i], msg.sender);
@@ -353,6 +357,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         uint256 totalPower;
 
         uint256 length = gauge.length;
+        if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
         for(uint256 i; i < length; i++) {
             totalPower += userPower[i];

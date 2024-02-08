@@ -1902,6 +1902,27 @@ describe('LootVoteController contract tests', () => {
 
         });
 
+        it(' should fail if the given list exceeds the max length', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const gauges = [gauge1.address, gauge2.address, gauge3.address]
+            const powers = [vote_power, vote_power2, vote_power3]
+            
+            const gauge_list = gauges.concat(gauges).concat(gauges).concat(gauges)
+            const power_list = powers.concat(powers).concat(powers).concat(powers)
+
+            await expect(
+                controller.connect(user1).voteForManyGaugeWeights(
+                    gauge_list,
+                    power_list
+                )
+            ).to.be.revertedWith('MaxVoteListExceeded')
+
+        });
+
     });
 
     describe('updateGaugeWeight', async () => {
@@ -4618,6 +4639,33 @@ describe('LootVoteController contract tests', () => {
             await expect(
                 controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address], [2000, 2500])
             ).to.be.revertedWith('ArraySizeMismatch')
+
+        });
+
+        it(' should fail if the given list exceeds the max length', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const gauges = [gauge1.address, gauge2.address, gauge3.address]
+            const powers = [vote_power, vote_power2, vote_power3]
+            
+            const gauge_list = gauges.concat(gauges).concat(gauges).concat(gauges)
+            const power_list = powers.concat(powers).concat(powers).concat(powers)
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
+                    user1.address,
+                    gauge_list,
+                    power_list
+                )
+            ).to.be.revertedWith('MaxVoteListExceeded')
 
         });
     
