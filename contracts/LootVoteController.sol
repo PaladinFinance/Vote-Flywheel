@@ -482,12 +482,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param user Address of the user
     */
     function _clearExpiredProxies(address user) internal {
-        address[] memory proxies = currentUserProxyVoters[user];
-        uint256 length = proxies.length;
+        uint256 length = currentUserProxyVoters[user].length;
         if(length == 0) return;
-        uint256 lastIndex = length - 1;
-        for(uint256 i; i < length; i++) {
-            address proxyVoter = proxies[i];
+        for(uint256 i; i < length;) {
+            address proxyVoter = currentUserProxyVoters[user][i];
             if(proxyVoterState[user][proxyVoter].endTimestamp < block.timestamp) {
                 // Free the user blocked voting power
                 blockedProxyPower[user] -= proxyVoterState[user][proxyVoter].maxPower;
@@ -495,10 +493,14 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
                 delete proxyVoterState[user][proxyVoter];
                 
                 // Remove the Proxy from the user's list
+                uint256 lastIndex = length - 1;
                 if(i != lastIndex) {
                     currentUserProxyVoters[user][i] = currentUserProxyVoters[user][length-1];
                 }
                 currentUserProxyVoters[user].pop();
+                length--;
+            } else {
+                unchecked{ i++; }
             }
         }
     }
