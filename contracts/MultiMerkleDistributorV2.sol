@@ -151,7 +151,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         if(isClaimed(questID, period, index)) revert Errors.AlreadyClaimed();
 
         // Check that the given parameters match the given Proof
-        bytes32 node = keccak256(abi.encodePacked(questID, period, index, account, amount));
+        bytes32 node = keccak256(bytes.concat(keccak256(abi.encode(questID, period, index, account, amount))));
         if(!MerkleProof.verify(merkleProof, questMerkleRootPerPeriod[questID][period], node)) revert Errors.InvalidProof();
 
         // Set the rewards as claimed for that period
@@ -223,7 +223,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
             // For each period given, if the proof matches the given parameters, 
             // set as claimed and add to the to total to transfer
-            bytes32 node = keccak256(abi.encodePacked(questID, claims[i].period, claims[i].index, account, claims[i].amount));
+            bytes32 node = keccak256(bytes.concat(keccak256(abi.encode(questID, claims[i].period, claims[i].index, account, claims[i].amount))));
             if(!MerkleProof.verify(claims[i].merkleProof, questMerkleRootPerPeriod[questID][claims[i].period], node)) revert Errors.InvalidProof();
 
             _setClaimed(questID, claims[i].period, claims[i].index);

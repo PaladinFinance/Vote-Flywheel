@@ -8,7 +8,6 @@ import { IERC20__factory } from "../../typechain/factories/@openzeppelin/contrac
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber } from "@ethersproject/bignumber";
-import { parseBalanceMap } from "../utils/merkle/parse-balance-map";
 import BalanceTree from "../utils/merkle/balance-tree";
 
 import {
