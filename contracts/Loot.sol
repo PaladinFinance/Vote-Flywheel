@@ -268,13 +268,13 @@ contract Loot is Owner, ReentrancyGuard {
     * @param receiver Address to receive the PAL & extra token
     */
     function claimLoot(uint256 id, address receiver) external nonReentrant {
-        if(id >= userLoots[msg.sender].length) revert Errors.InvalidId();
+        if(id >= userLoots[msg.sender].length) revert Errors.InvalidId(id);
         if(receiver == address(0)) revert Errors.AddressZero();
         // Load the Loot state
         LootData storage loot = userLoots[msg.sender][id];
 
         if(loot.claimed) revert Errors.AlreadyClaimed();
-        if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
+        if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted(id);
         loot.claimed = true;
 
         
@@ -315,12 +315,12 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 totalExtraAmount;
 
         for(uint256 i; i < length;){
-            if(ids[i] >= userLoots[msg.sender].length) revert Errors.InvalidId();
+            if(ids[i] >= userLoots[msg.sender].length) revert Errors.InvalidId(ids[i]);
             // Load the Loot state
             LootData storage loot = userLoots[msg.sender][ids[i]];
 
             if(loot.claimed) revert Errors.AlreadyClaimed();
-            if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
+            if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted(ids[i]);
             loot.claimed = true;
 
             // Check if the Loot is still vesting, and slash the PAL amount if needed

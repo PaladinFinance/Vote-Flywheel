@@ -54,8 +54,8 @@ library Errors {
 
     // Loot
     error CreatorAlreadySet();
-    error InvalidId();
-    error VestingNotStarted();
+    error InvalidId(uint256 id);
+    error VestingNotStarted(uint256 id);
 
     // Loot Creator
     error NotListed();
