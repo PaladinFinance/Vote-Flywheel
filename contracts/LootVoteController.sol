@@ -658,7 +658,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeight[gauge][ts];
-        for(uint256 i; i < 100; i++) {
+        for(uint256 i; i < 150; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
@@ -692,7 +692,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeightTotal[ts];
-        for(uint256 i; i < 100; i++) {
+        for(uint256 i; i < 150; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
