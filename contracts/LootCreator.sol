@@ -156,6 +156,12 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address _lootVoteController,
         address _holyPower
     ) {
+        if(
+            _loot == address(0)
+            || _lootVoteController == address(0)
+            || _holyPower == address(0)
+        ) revert Errors.AddressZero();
+
         loot = _loot;
         lootVoteController = _lootVoteController;
         holyPower = _holyPower;

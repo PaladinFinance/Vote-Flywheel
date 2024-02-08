@@ -73,6 +73,13 @@ contract LootBudget is Owner, ReentrancyGuard {
         uint256 _palWeeklyBudget,
         uint256 _extraWeeklyBudget
     ) {
+        if(
+            _pal == address(0)
+            || _extraToken == address(0)
+            || _lootCreator == address(0)
+            || _lootReserve == address(0)
+        ) revert Errors.AddressZero();
+
         pal = _pal;
         extraToken = _extraToken;
         lootCreator = _lootCreator;

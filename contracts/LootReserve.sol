@@ -51,6 +51,8 @@ contract LootReserve is Owner {
         address _pal,
         address _extraToken
     ){
+        if(_pal == address(0) || _extraToken == address(0)) revert Errors.AddressZero();
+
         pal = IERC20(_pal);
         extraToken = IERC20(_extraToken);
     }

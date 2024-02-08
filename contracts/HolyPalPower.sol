@@ -47,6 +47,8 @@ contract HolyPalPower is IHolyPalPower {
     // Constructor
 
     constructor(address _hPal) {
+        if( _hPal == address(0)) revert Errors.AddressZero();
+
         hPal = _hPal;
     }
 

@@ -190,6 +190,8 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     // Constructor
 
     constructor(address _hPalPower) {
+        if(_hPalPower == address(0)) revert Errors.AddressZero();
+
         hPalPower = _hPalPower;
 
         nextBoardId++;

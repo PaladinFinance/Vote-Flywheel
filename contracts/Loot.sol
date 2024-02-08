@@ -93,6 +93,12 @@ contract Loot is Owner, ReentrancyGuard {
         address _tokenReserve,
         uint256 _vestingDuration
     ){
+        if(
+            _pal == address(0)
+            || _extraToken == address(0)
+            || _tokenReserve == address(0)
+        ) revert Errors.AddressZero();
+
         pal = IERC20(_pal);
         extraToken = IERC20(_extraToken);
         tokenReserve = _tokenReserve;
