@@ -38,6 +38,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 extraAmount;
         // Timestamp at which the vesting starts
         uint256 startTs;
+        // Timestamp at which the vesting starts
+        uint256 endTs;
         // Flag to check if the Loot has been claimed
         bool claimed;
     }
@@ -140,7 +142,7 @@ contract Loot is Owner, ReentrancyGuard {
         palAmount = loot.palAmount;
         extraAmount = loot.extraAmount;
         startTs = loot.startTs;
-        endTs = loot.startTs + vestingDuration;
+        endTs = loot.endTs;
         claimed = loot.claimed;
     }
 
@@ -252,6 +254,7 @@ contract Loot is Owner, ReentrancyGuard {
             palAmount: palAmount,
             extraAmount: extraAmount,
             startTs: startTs,
+            endTs: startTs + vestingDuration,
             claimed: false
         }));
 
@@ -279,9 +282,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 palAmount = loot.palAmount;
         if(palAmount > 0) {
             // Check if the Loot is still vesting, and slash the PAL amount if needed
-            uint256 vestingEndTs = loot.startTs + vestingDuration;
-            if(block.timestamp < vestingEndTs){
-                uint256 remainingVesting = vestingEndTs - block.timestamp;
+            if(block.timestamp < loot.endTs){
+                uint256 remainingVesting = loot.endTs - block.timestamp;
                 uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
                 // Notify the LootCreator of the slashed amount
@@ -324,9 +326,8 @@ contract Loot is Owner, ReentrancyGuard {
             // Check if the Loot is still vesting, and slash the PAL amount if needed
             uint256 palAmount = loot.palAmount;
             if(palAmount > 0) {
-                uint256 vestingEndTs = loot.startTs + vestingDuration;
-                if(block.timestamp < vestingEndTs){
-                    uint256 remainingVesting = vestingEndTs - block.timestamp;
+                if(block.timestamp < loot.endTs){
+                    uint256 remainingVesting = loot.endTs - block.timestamp;
                     uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
                     // Notify the LootCreator of the slashed amount

@@ -177,6 +177,7 @@ describe('Loot contract tests', () => {
             expect(new_loot.palAmount).to.be.eq(pal_amount)
             expect(new_loot.extraAmount).to.be.eq(extra_amount)
             expect(new_loot.startTs).to.be.eq(start_ts)
+            expect(new_loot.endTs).to.be.eq(start_ts.add(vesting_duration))
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, expected_id, pal_amount, extra_amount, start_ts)
@@ -197,6 +198,7 @@ describe('Loot contract tests', () => {
             expect(new_loot.palAmount).to.be.eq(pal_amount)
             expect(new_loot.extraAmount).to.be.eq(extra_amount)
             expect(new_loot.startTs).to.be.eq(start_ts)
+            expect(new_loot.endTs).to.be.eq(start_ts.add(vesting_duration))
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, expected_id, pal_amount, extra_amount, start_ts)
@@ -211,6 +213,7 @@ describe('Loot contract tests', () => {
             expect(new_loot_2.palAmount).to.be.eq(pal_amount_2)
             expect(new_loot_2.extraAmount).to.be.eq(extra_amount_2)
             expect(new_loot_2.startTs).to.be.eq(start_ts_2)
+            expect(new_loot_2.endTs).to.be.eq(start_ts_2.add(vesting_duration))
             expect(new_loot_2.claimed).to.be.false
 
             expect(tx_2).to.emit(loot, 'LootCreated').withArgs(user1.address, expected_id_2, pal_amount_2, extra_amount_2, start_ts_2)
@@ -237,6 +240,7 @@ describe('Loot contract tests', () => {
             expect(new_loot.palAmount).to.be.eq(pal_amount)
             expect(new_loot.extraAmount).to.be.eq(extra_amount)
             expect(new_loot.startTs).to.be.eq(start_ts)
+            expect(new_loot.endTs).to.be.eq(start_ts.add(vesting_duration))
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, expected_id, pal_amount, extra_amount, start_ts)
@@ -249,6 +253,7 @@ describe('Loot contract tests', () => {
             expect(new_loot_2.palAmount).to.be.eq(pal_amount_2)
             expect(new_loot_2.extraAmount).to.be.eq(extra_amount_2)
             expect(new_loot_2.startTs).to.be.eq(start_ts)
+            expect(new_loot_2.endTs).to.be.eq(start_ts.add(vesting_duration))
             expect(new_loot_2.claimed).to.be.false
 
             expect(tx_2).to.emit(loot, 'LootCreated').withArgs(user2.address, expected_id_2, pal_amount_2, extra_amount_2, start_ts)
