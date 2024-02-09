@@ -50,6 +50,9 @@ describe('LootBudget contract tests', () => {
     const pal_budget = ethers.utils.parseEther("1200")
     const extra_budget = ethers.utils.parseEther("0.01")
 
+    const pal_limit = ethers.utils.parseEther("4500")
+    const extra_limit = ethers.utils.parseEther("0.5")
+
 
     before(async () => {
         await resetFork();
@@ -80,12 +83,14 @@ describe('LootBudget contract tests', () => {
             lootCreator.address,
             lootReserve.address,
             pal_budget,
-            extra_budget
+            extra_budget,
+            pal_limit,
+            extra_limit
         )) as LootBudget
         await budget.deployed()
 
-        await pal.connect(admin).transfer(budget.address, PAL_AMOUNT.div(10))
-        await extraToken.connect(admin).transfer(budget.address, EXTRA_AMOUNT.div(10))
+        await pal.connect(admin).transfer(budget.address, PAL_AMOUNT.div(20))
+        await extraToken.connect(admin).transfer(budget.address, EXTRA_AMOUNT.div(20))
 
     });
 
@@ -236,6 +241,14 @@ describe('LootBudget contract tests', () => {
 
         });
 
+        it(' should fail if over the limit', async () => {
+
+            await expect(
+                budget.connect(admin).updatePalWeeklyBudget(ethers.utils.parseEther("7500"))
+            ).to.be.revertedWith('LootBudgetExceedLimit')
+
+        });
+
         it(' should only be allowed for owner', async () => {
 
             await expect(
@@ -266,6 +279,14 @@ describe('LootBudget contract tests', () => {
 
         });
 
+        it(' should fail if over the limit', async () => {
+
+            await expect(
+                budget.connect(admin).updateExtraWeeklyBudget(ethers.utils.parseEther("0.75"))
+            ).to.be.revertedWith('LootBudgetExceedLimit')
+
+        });
+
         it(' should only be allowed for owner', async () => {
 
             await expect(
@@ -274,6 +295,66 @@ describe('LootBudget contract tests', () => {
 
             await expect(
                 budget.connect(loot).updateExtraWeeklyBudget(new_budget)
+            ).to.be.reverted
+
+        });
+
+    });
+
+    describe('setPalWeeklyLimit', async () => {
+
+        const new_limit = ethers.utils.parseEther("7500")
+
+        it(' should update the limit correctly', async () => {
+
+            expect(await budget.palWeeklyLimit()).to.be.eq(pal_limit)
+
+            const tx = await budget.connect(admin).setPalWeeklyLimit(new_limit)
+
+            expect(await budget.palWeeklyLimit()).to.be.eq(new_limit)
+
+            await expect(tx).to.emit(budget, 'PalWeeklyLimitUpdated').withArgs(pal_limit, new_limit)
+
+        });
+
+        it(' should only be allowed for owner', async () => {
+
+            await expect(
+                budget.connect(otherUser).setPalWeeklyLimit(new_limit)
+            ).to.be.reverted
+
+            await expect(
+                budget.connect(loot).setPalWeeklyLimit(new_limit)
+            ).to.be.reverted
+
+        });
+
+    });
+
+    describe('setExtraWeeklyLimit', async () => {
+
+        const new_limit = ethers.utils.parseEther("0.75")
+
+        it(' should update the limit correctly', async () => {
+
+            expect(await budget.extraWeeklyLimit()).to.be.eq(extra_limit)
+
+            const tx = await budget.connect(admin).setExtraWeeklyLimit(new_limit)
+
+            expect(await budget.extraWeeklyLimit()).to.be.eq(new_limit)
+
+            await expect(tx).to.emit(budget, 'ExtraWeeklyLimitUpdated').withArgs(extra_limit, new_limit)
+
+        });
+
+        it(' should only be allowed for owner', async () => {
+
+            await expect(
+                budget.connect(otherUser).setExtraWeeklyLimit(new_limit)
+            ).to.be.reverted
+
+            await expect(
+                budget.connect(loot).setExtraWeeklyLimit(new_limit)
             ).to.be.reverted
 
         });

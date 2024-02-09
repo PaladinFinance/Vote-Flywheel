@@ -61,6 +61,9 @@ library Errors {
     // Loot Creator
     error NotListed();
 
+    // Loot Buget
+    error LootBudgetExceedLimit();
+
     //Maths
     error ConversionOverflow();
 }

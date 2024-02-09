@@ -232,7 +232,9 @@ describe('Vote Controller - Voting tests', () => {
             creator.address,
             reserve.address,
             0,
-            0
+            0,
+            ethers.utils.parseEther("10000"),
+            ethers.utils.parseEther("50000")
         )) as LootBudget
         await budget.deployed()
 
