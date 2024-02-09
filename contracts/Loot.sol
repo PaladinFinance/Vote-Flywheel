@@ -171,11 +171,12 @@ contract Loot is Owner, ReentrancyGuard {
     * @return uint256[] : List of active Loot IDs
     */
     function getAllActiveUserLootIds(address user) external view returns(uint256[] memory){
-        uint256 length = userLoots[user].length;
+        LootData[] memory _loots = userLoots[user];
+        uint256 length = _loots.length;
         uint256 activeCount;
 
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) activeCount++;
+            if(!_loots[i].claimed) activeCount++;
             unchecked { i++; }
         }
 
@@ -183,8 +184,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256[] memory ids = new uint256[](activeCount);
         uint256 j;
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) {
-                ids[j] = userLoots[user][i].id;
+            if(!_loots[i].claimed) {
+                ids[j] = _loots[i].id;
                 unchecked { j++; }
             }
             unchecked { i++; }
@@ -210,11 +211,12 @@ contract Loot is Owner, ReentrancyGuard {
     * @return LootData[] : List of active Loots
     */
     function getAllActiveUserLoot(address user) external view returns(LootData[] memory){
-        uint256 length = userLoots[user].length;
+        LootData[] memory _loots = userLoots[user];
+        uint256 length = _loots.length;
         uint256 activeCount;
 
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) activeCount++;
+            if(!_loots[i].claimed) activeCount++;
             unchecked { i++; }
         }
 
@@ -222,8 +224,8 @@ contract Loot is Owner, ReentrancyGuard {
         LootData[] memory loots = new LootData[](activeCount);
         uint256 j;
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) {
-                loots[j] = userLoots[user][i];
+            if(!_loots[i].claimed) {
+                loots[j] = _loots[i];
                 unchecked { j++; }
             }
             unchecked { i++; }
@@ -243,7 +245,7 @@ contract Loot is Owner, ReentrancyGuard {
     * @param palAmount Amount of PAL
     * @param extraAmount Amount of extra token
     */
-    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external nonReentrant onlyLootCreator {
+    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external onlyLootCreator {
         if(palAmount == 0 && extraAmount == 0) return;
 
         uint256 lootId = userLoots[user].length;

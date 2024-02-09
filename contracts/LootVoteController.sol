@@ -11,7 +11,6 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ILootVoteController} from "./interfaces/ILootVoteController.sol";
 import {IHolyPalPower} from "./interfaces/IHolyPalPower.sol";
 import "./libraries/Errors.sol";
@@ -23,7 +22,7 @@ import "./utils/Owner.sol";
     Contract handling the vote logic for repartition of the global Loot budget
     between all the listed gauges for the Quest system
 */
-contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
+contract LootVoteController is Owner, ILootVoteController {
     using SafeERC20 for IERC20;
 
     // Constants
@@ -308,7 +307,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauge
     * @param userPower Power used for this gauge
     */
-    function voteForGaugeWeights(address gauge, uint256 userPower) external nonReentrant {
+    function voteForGaugeWeights(address gauge, uint256 userPower) external {
         _voteForGauge(msg.sender, gauge, userPower, msg.sender);
     }
 
@@ -318,7 +317,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external nonReentrant {
+    function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external {
         uint256 length = gauge.length;
         if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
@@ -334,7 +333,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauge
     * @param userPower Power used for this gauge
     */
-    function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external nonReentrant {
+    function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external {
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
@@ -350,7 +349,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external nonReentrant {
+    function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external {
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
@@ -442,7 +441,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param maxPower Max voting power allowed for the Proxy
     * @param endTimestamp Timestamp of the Proxy expiry
     */
-    function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external nonReentrant {
+    function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external {
         if(!isProxyManager[user][msg.sender] && msg.sender != user) revert Errors.NotAllowedManager();
         if(maxPower == 0 || maxPower > MAX_BPS) revert Errors.VotingPowerInvalid();
 

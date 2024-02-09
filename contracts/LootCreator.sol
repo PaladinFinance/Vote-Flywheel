@@ -278,7 +278,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param period Timestamp of the period
     * @param claimedAmount Amount of rewards claimed by the user
     */
-    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor nonReentrant {
+    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor {
         userQuestPeriodRewards[msg.sender][questId][period][user] = claimedAmount;
     }
 
@@ -347,7 +347,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @dev Notifies the amount of rewards slashed from a claimed Loot & add them to the pending budget
     * @param palAmount Amount of PAL tokens slashed
     */
-	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot nonReentrant {
+	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot {
         // Add undistributed rewards from Loot to the pending budget
         pengingBudget.palAmount += uint128(palAmount);
     }
