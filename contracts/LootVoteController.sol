@@ -308,6 +308,9 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param userPower Power used for this gauge
     */
     function voteForGaugeWeights(address gauge, uint256 userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(msg.sender);
+
         _voteForGauge(msg.sender, gauge, userPower, msg.sender);
     }
 
@@ -318,6 +321,9 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param userPower Power used for each gauge
     */
     function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(msg.sender);
+
         uint256 length = gauge.length;
         if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
@@ -334,6 +340,9 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param userPower Power used for this gauge
     */
     function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(user);
+
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
@@ -350,6 +359,9 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param userPower Power used for each gauge
     */
     function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(user);
+
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
@@ -547,14 +559,14 @@ contract LootVoteController is Owner, ILootVoteController {
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
 
-        // Clear any expired past Proxy
-        _clearExpiredProxies(user);
-
         // Load the user past vote state
         VotedSlope memory oldSlope = voteUserSlopes[user][gauge];
         if(oldSlope.end > vars.nextPeriod) {
             vars.oldBias = oldSlope.slope * (oldSlope.end - vars.nextPeriod);
         }
+
+        // No vote to cast & no previous vote to remove == useless action
+        if(userPower == 0 && oldSlope.power == 0) return;
 
         // Calculate the new vote state
         VotedSlope memory newSlope = VotedSlope({
