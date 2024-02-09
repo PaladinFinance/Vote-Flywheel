@@ -344,6 +344,11 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
             IERC20(questRewardToken[questID]).safeTransfer(questBoard, extraAmount);
         }
 
+        // If a Loot Creator is set, notify it of the new Quest Period distributed
+        if(lootCreator != address(0)) {
+            ILootCreator(lootCreator).notifyFixedQuestPeriod(questID, period, newTotalRewardAmount);
+        }
+
         return true;
     }
    
@@ -441,6 +446,11 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         questMerkleRootPerPeriod[questID][period] = merkleRoot;
 
         questRewardsPerPeriod[questID][period] += addedRewardAmount;
+
+        // If a Loot Creator is set, notify it of the new Quest Period distributed
+        if(lootCreator != address(0) && addedRewardAmount > 0) {
+            ILootCreator(lootCreator).notifyAddedRewardsQuestPeriod(questID, period, addedRewardAmount);
+        }
 
         emit QuestPeriodUpdated(questID, period, merkleRoot);
 

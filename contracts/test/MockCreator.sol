@@ -18,6 +18,8 @@ contract MockCreator {
     // id -> period -> user -> amount
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public userQuestPeriodRewards;
 
+    bool public emergencyNotified;
+
     constructor(
         address _loot
     ) {
@@ -40,6 +42,19 @@ contract MockCreator {
     function notifyDistributedQuestPeriod(uint256 questID, uint256 period, uint256 totalAmount) external {
         totalQuestPeriodRewards[questID][period] = totalAmount;
         totalQuestPeriodSet[questID][period] = true;
+    }
+
+    function notifyFixedQuestPeriod(uint256 questId, uint256 period, uint256 newTotalRewards) external {
+        totalQuestPeriodRewards[questId][period] = newTotalRewards;
+    }
+
+    function notifyAddedRewardsQuestPeriod(uint256 questId, uint256 period, uint256 addedRewards) external {
+        totalQuestPeriodRewards[questId][period] += addedRewards;
+        emergencyNotified = true;
+    }
+
+    function resetEmergencyNotified() external {
+        emergencyNotified = false;
     }
 
     function notifyQuestClaim(address user, uint256 questID, uint256 period, uint256 claimedAmount) external {

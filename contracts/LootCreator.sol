@@ -343,6 +343,26 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     }
 
     /**
+    * @dev Notifies of the amount distributed on a Quest was fixed
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    * @param newTotalRewards New total amount of rewards distributed for the period for the Quest
+    */
+    function notifyFixedQuestPeriod(uint256 questId, uint256 period, uint256 newTotalRewards) external onlyAllowedDistributor {
+        totalQuestPeriodRewards[msg.sender][questId][period] = newTotalRewards;
+    }
+
+    /**
+    * @dev Notifies of the amount added to a Quest period via emergency update in Distributors
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    * @param addedRewards Amount added to the total
+    */
+    function notifyAddedRewardsQuestPeriod(uint256 questId, uint256 period, uint256 addedRewards) external onlyAllowedDistributor {
+        totalQuestPeriodRewards[msg.sender][questId][period] += addedRewards;
+    }
+
+    /**
     * @notice Notifies of undistributed rewards
     * @dev Notifies the amount of rewards slashed from a claimed Loot & add them to the pending budget
     * @param palAmount Amount of PAL tokens slashed

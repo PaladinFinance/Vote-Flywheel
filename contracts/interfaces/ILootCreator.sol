@@ -30,6 +30,8 @@ interface ILootCreator {
 
 	function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external;
 	function notifyDistributedQuestPeriod(uint256 questId, uint256 period, uint256 totalRewards) external;
+	function notifyFixedQuestPeriod(uint256 questId, uint256 period, uint256 newTotalRewards) external;
+    function notifyAddedRewardsQuestPeriod(uint256 questId, uint256 period, uint256 addedRewards) external;
 	function notifyUndistributedRewards(uint256 palAmount) external;
 	function notifyNewBudget(uint256 palAmount, uint256 extraAmount) external;
 
