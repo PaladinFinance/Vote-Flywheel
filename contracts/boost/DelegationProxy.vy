@@ -48,6 +48,10 @@ future_ownership_admin: public(address)
 
 @external
 def __init__(_voting_escrow: address, _delegation: address, _o_admin: address, _e_admin: address):
+    assert _voting_escrow != ZERO_ADDRESS
+    assert _o_admin != ZERO_ADDRESS
+    assert _e_admin != ZERO_ADDRESS
+
     HOLY_PAL_POWER = _voting_escrow
 
     self.delegation = _delegation

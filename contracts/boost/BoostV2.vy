@@ -66,6 +66,8 @@ received_checkpoints_nonces: public(HashMap[address, uint256])
 
 @external
 def __init__(_ve: address):
+    assert _ve != ZERO_ADDRESS
+
     HOLY_PAL_POWER = _ve
 
     log Transfer(ZERO_ADDRESS, msg.sender, 0)
