@@ -320,13 +320,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // If the gauge weight is higher than the cap, we need to handle the un-allocated rewards
         if(gaugeWeight > gaugeCap) {
-            uint256 unsunedWeight = gaugeWeight - gaugeCap;
+            uint256 unusedWeight = gaugeWeight - gaugeCap;
 
             gaugeWeight = gaugeCap;
 
             // Handle un-allocated budget => set it as pending for next periods
-            pengingBudget.palAmount += uint128(uint256(budget.palAmount) * unsunedWeight / UNIT);
-            pengingBudget.extraAmount += uint128(uint256(budget.extraAmount) * unsunedWeight / UNIT);
+            pengingBudget.palAmount += uint128(uint256(budget.palAmount) * unusedWeight / UNIT);
+            pengingBudget.extraAmount += uint128(uint256(budget.extraAmount) * unusedWeight / UNIT);
         }
 
         // Calculate the allocated budget for the gauge
