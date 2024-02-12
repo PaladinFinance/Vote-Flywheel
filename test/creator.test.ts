@@ -1084,6 +1084,34 @@ describe('LootCreator contract tests', () => {
 
         });
 
+        it(' should notify multiple claims of same user correctly (in case of fixed period)', async () => {
+
+            const extra_claim_amount = ethers.utils.parseEther("125")
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(0)
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user1.address,
+                quest_id,
+                period,
+                claim_amount
+            )
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(claim_amount)
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user1.address,
+                quest_id,
+                period,
+                extra_claim_amount
+            )
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(claim_amount.add(extra_claim_amount))
+
+        });
+
         it(' should only be allowed for listed distributor', async () => {
 
             await expect(

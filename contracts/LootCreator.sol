@@ -282,7 +282,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param claimedAmount Amount of rewards claimed by the user
     */
     function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor {
-        userQuestPeriodRewards[msg.sender][questId][period][user] = claimedAmount;
+        userQuestPeriodRewards[msg.sender][questId][period][user] += claimedAmount;
     }
 
     /**
