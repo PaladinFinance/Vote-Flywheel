@@ -1,8 +1,8 @@
 import MerkleTree from './merkle-tree'
 import { BigNumber, utils } from 'ethers'
-import { keccak256 } from 'ethereum-cryptography/keccak';
+/*import { keccak256 } from 'ethereum-cryptography/keccak';
 import { hexToBytes } from 'ethereum-cryptography/utils';
-import { defaultAbiCoder } from '@ethersproject/abi';
+import { defaultAbiCoder } from '@ethersproject/abi';*/
 
 export default class BalanceTree {
   private readonly tree: MerkleTree
@@ -32,17 +32,14 @@ export default class BalanceTree {
   }
 
   public static toNode(questID:BigNumber, period:BigNumber,index: number | BigNumber, account: string, amount: BigNumber): Buffer {
-    /*return Buffer.from(
-      utils.solidityKeccak256(
-          ['bytes'],
-          utils.concat([utils.solidityKeccak256(['uint256', 'uint256', 'uint256', 'address', 'uint256'], [ questID, period, index, account, amount])])
-        ).substr(2),
-        'hex'
-      )*/
-    return Buffer.from(keccak256(keccak256(hexToBytes(defaultAbiCoder.encode(
+    return Buffer.from(
+      utils.solidityKeccak256(['uint256', 'uint256', 'uint256', 'address', 'uint256'], [ questID, period, index, account, amount]).substr(2),
+      'hex'
+    )
+    /*return Buffer.from(keccak256(keccak256(hexToBytes(defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint256', 'address', 'uint256'],
       [ questID, period, index, account, amount]
-    )))));
+    )))));*/
   }
 
   public getHexRoot(): string {
