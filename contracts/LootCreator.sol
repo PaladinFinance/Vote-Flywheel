@@ -111,9 +111,12 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public totalQuestPeriodRewards;
     /** @notice Was the total reward set for a Quest period */
     mapping(address => mapping(uint256 => mapping(uint256 => bool))) public totalQuestPeriodSet;
-    /** @notice User claime damount for a Quest period */
+    /** @notice User claimed amount for a Quest period */
     // distributor -> id -> period -> user -> amount
     mapping(address => mapping(uint256 => mapping(uint256 => mapping(address => uint256)))) public userQuestPeriodRewards;
+    /** @notice User created Loot for a Quest period */
+    // distributor -> id -> period -> user -> bool
+    mapping(address => mapping(uint256 => mapping(uint256 => mapping(address => bool)))) public userQuestPeriodCreated;
 
 
     // Events
@@ -494,6 +497,10 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         
         vars.gauge = _getQuestGauge(questId, distributor);
         if(!ILootVoteController(lootVoteController).isListedGauge(vars.gauge)) return;
+
+        // Prevent from creating again a Loot for the same Quest period
+        if(userQuestPeriodCreated[distributor][questId][period][user]) return;
+        userQuestPeriodCreated[distributor][questId][period][user] = true;
 
         // Get Quest allocation
         Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, questId, distributor, period);
