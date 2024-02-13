@@ -255,6 +255,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param period Timestamp of the period
     */
     function createLoot(address user, address distributor, uint256 questId, uint256 period) external nonReentrant {
+        if(user == address(0)) revert Errors.AddressZero();
         _createLoot(user, distributor, questId, period);
     }
 
@@ -265,6 +266,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param params Quest claim parameters (distributor, questId, period)
     */
     function createMultipleLoot(address user, MultiCreate[] calldata params) external nonReentrant {
+        if(user == address(0)) revert Errors.AddressZero();
         uint256 length = params.length;
         if(length == 0) revert Errors.EmptyParameters();
 
