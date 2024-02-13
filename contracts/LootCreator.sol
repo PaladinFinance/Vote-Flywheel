@@ -509,7 +509,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         if(vars.userPeriodRewards == 0) return;
 
         // Calculate ratios based on that
-        vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
+        vars.lockedRatio = vars.totalPower == 0 ? 0 : (vars.userPower * UNIT) / vars.totalPower; // prevent revert if no more hPAL Locked
         vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[distributor][questId][period];
         if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
 
