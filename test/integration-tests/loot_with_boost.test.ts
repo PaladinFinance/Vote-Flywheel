@@ -65,7 +65,7 @@ let lootFactory: ContractFactory
 let reserveFactory: ContractFactory
 let distributorFactory: ContractFactory
 
-describe('Vote Controller - Voting tests - with delegated boost', () => {
+describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
     let admin: SignerWithAddress
     let boardAdmin: SignerWithAddress
 

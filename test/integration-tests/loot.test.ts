@@ -65,7 +65,7 @@ let lootFactory: ContractFactory
 let reserveFactory: ContractFactory
 let distributorFactory: ContractFactory
 
-describe('Vote Controller - Voting tests', () => {
+describe('Loot - Voting & Loot creation tests', () => {
     let admin: SignerWithAddress
     let boardAdmin: SignerWithAddress
 
@@ -446,6 +446,8 @@ describe('Vote Controller - Voting tests', () => {
 
             const prev_budget_period = await creator.nextBudgetUpdatePeriod()
 
+            const prev_pending_budget = await creator.pengingBudget()
+
             const prev_period_allocated = await creator.allocatedBudgetHistory(closed_period)
 
             await board1.connect(boardAdmin).closeQuestPeriod(closed_period)
@@ -488,8 +490,14 @@ describe('Vote Controller - Voting tests', () => {
 
             expect(gauge_weight2).to.be.gt(gauge_cap2)
 
+            const over_cap_pal_amount2 = period_budget.palAmount.mul(gauge_weight2).div(UNIT)
+            const over_cap_extra_amount2 = period_budget.extraAmount.mul(gauge_weight2).div(UNIT)
+
             const gauge_pal_amount2 = period_budget.palAmount.mul(gauge_cap2).div(UNIT)
             const gauge_extra_amount2 = period_budget.extraAmount.mul(gauge_cap2).div(UNIT)
+
+            const unused_pal_amount2 = over_cap_pal_amount2.sub(gauge_pal_amount2)
+            const unused_extra_amount2 = over_cap_extra_amount2.sub(gauge_extra_amount2)
 
             const gauge_pal_per_vote2 = gauge_pal_amount2.mul(UNIT).div(rewards_per_period2).mul(UNIT).div(MAX_MULTIPLIER)
             const gauge_extra_per_vote2 = gauge_extra_amount2.mul(UNIT).div(rewards_per_period2).mul(UNIT).div(MAX_MULTIPLIER)
@@ -504,9 +512,14 @@ describe('Vote Controller - Voting tests', () => {
 
             const new_period_allocated = await creator.allocatedBudgetHistory(closed_period)
 
-            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(gauge_pal_amount).add(gauge_pal_amount2))
-            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount).add(gauge_extra_amount2))
-            
+            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(gauge_pal_amount).add(over_cap_pal_amount2))
+            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount).add(over_cap_extra_amount2))
+
+            const new_pending_budget = await creator.pengingBudget()
+
+            expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(unused_pal_amount2))
+            expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(unused_extra_amount2))
+
             expect(await creator.isGaugeAllocatedForPeriod(VALID_GAUGES[0].gauge, closed_period)).to.be.true
             expect(await creator.totalQuestPeriodSet(distributor1.address, quest_id1, closed_period)).to.be.true
             expect(await creator.totalQuestPeriodRewards(distributor1.address, quest_id1, closed_period)).to.be.eq(rewards_per_period)

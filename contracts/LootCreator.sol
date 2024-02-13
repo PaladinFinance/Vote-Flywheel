@@ -327,8 +327,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
             gaugeWeight = gaugeCap;
 
             // Handle un-allocated budget => set it as pending for next periods
-            pengingBudget.palAmount += uint128(uint256(budget.palAmount) * unusedWeight / UNIT);
-            pengingBudget.extraAmount += uint128(uint256(budget.extraAmount) * unusedWeight / UNIT);
+            uint128 unusedPal = uint128(uint256(budget.palAmount) * unusedWeight / UNIT);
+            uint128 unusedExtra = uint128(uint256(budget.extraAmount) * unusedWeight / UNIT);
+
+            pengingBudget.palAmount += unusedPal;
+            pengingBudget.extraAmount += unusedExtra;
+            allocatedBudgetHistory[period].palAmount += unusedPal;
+            allocatedBudgetHistory[period].extraAmount += unusedExtra;
         }
 
         // Calculate the allocated budget for the gauge

@@ -814,6 +814,8 @@ describe('LootCreator contract tests', () => {
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(period)
 
+            const prev_pending_budget = await creator.pengingBudget()
+
             await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
                 creator.address,
                 quest_id,
@@ -825,8 +827,14 @@ describe('LootCreator contract tests', () => {
 
             const UNIT = ethers.utils.parseEther("1")
 
+            const over_cap_pal_amount = period_budget.palAmount.mul(bigger_gauge_weight).div(UNIT)
+            const over_cap_extra_amount = period_budget.extraAmount.mul(bigger_gauge_weight).div(UNIT)
+
             const gauge_pal_amount = period_budget.palAmount.mul(gauge_cap).div(UNIT)
             const gauge_extra_amount = period_budget.extraAmount.mul(gauge_cap).div(UNIT)
+
+            const unused_pal_amount = over_cap_pal_amount.sub(gauge_pal_amount)
+            const unused_extra_amount = over_cap_extra_amount.sub(gauge_extra_amount)
 
             const gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
@@ -835,8 +843,13 @@ describe('LootCreator contract tests', () => {
 
             const new_period_allocated = await creator.allocatedBudgetHistory(period)
 
-            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(gauge_pal_amount))
-            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount))
+            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(over_cap_pal_amount))
+            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(over_cap_extra_amount))
+
+            const new_pending_budget = await creator.pengingBudget()
+
+            expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(unused_pal_amount))
+            expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(unused_extra_amount))
             
             expect(await creator.isGaugeAllocatedForPeriod(questGauge1.address, period)).to.be.true
             expect(await creator.totalQuestPeriodSet(distributor.address, quest_id, period)).to.be.true
