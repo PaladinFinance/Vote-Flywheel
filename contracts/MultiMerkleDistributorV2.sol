@@ -331,6 +331,7 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
         if(questRewardToken[questID] == address(0)) revert Errors.QuestNotListed();
         if(period == 0) revert Errors.IncorrectPeriod();
         if(questRewardsPerPeriod[questID][period] == 0) revert Errors.PeriodNotListed();
+        if(questMerkleRootPerPeriod[questID][period] != 0) revert Errors.PeriodAlreadyUpdated();
 
         uint256 previousTotalRewardAmount = questRewardsPerPeriod[questID][period];
 
@@ -342,11 +343,6 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
 
             uint256 extraAmount = previousTotalRewardAmount - newTotalRewardAmount;
             IERC20(questRewardToken[questID]).safeTransfer(questBoard, extraAmount);
-        }
-
-        // If a Loot Creator is set, notify it of the new Quest Period distributed
-        if(lootCreator != address(0)) {
-            ILootCreator(lootCreator).notifyFixedQuestPeriod(questID, period, newTotalRewardAmount);
         }
 
         return true;

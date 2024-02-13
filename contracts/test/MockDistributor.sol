@@ -21,10 +21,6 @@ contract MockDistributor {
         ILootCreator(target).notifyQuestClaim(user, questId, period, claimedAmount);
     }
 
-    function sendNotifyFixedQuestPeriod(address target, uint256 questId, uint256 period, uint256 newTotalRewards) external {
-        ILootCreator(target).notifyFixedQuestPeriod(questId, period, newTotalRewards);
-    }
-
     function sendNotifyAddedRewardsQuestPeriod(address target, uint256 questId, uint256 period, uint256 addedRewards) external {
         ILootCreator(target).notifyAddedRewardsQuestPeriod(questId, period, addedRewards);
     }
