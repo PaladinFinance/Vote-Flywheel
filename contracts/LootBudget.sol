@@ -40,7 +40,7 @@ contract LootBudget is Owner, ReentrancyGuard {
     address immutable public extraToken;
     
     /** @notice Address of the Loot Creator contract */
-    address immutable public lootCreator;
+    address public lootCreator;
     /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
 
@@ -70,6 +70,8 @@ contract LootBudget is Owner, ReentrancyGuard {
     event ExtraWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
     /** @notice Event emitted when the Reserve is canceled and token claimed back */
     event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
+    /** @notice Event emitted when the Loot Creator address is updated */
+    event LootCreatorUpdated(address oldCreator, address newCreator);
 
 
     // Constructor
@@ -170,6 +172,22 @@ contract LootBudget is Owner, ReentrancyGuard {
         extraWeeklyBudget = newBudget;
 
         emit ExtraWeeklyBudgetUpdated(oldBudget, newBudget);
+    }
+
+    /**
+    * @notice Updates the Loot Creator contract address
+    * @dev Updates the Loot Creator contract address
+    * @param _lootCreator Address of the new Loot Creator contract
+    */
+    function updateLootCreator(address _lootCreator) external onlyOwner {
+        if(_lootCreator == address(0)) revert Errors.InvalidParameter();
+
+        address oldCreator = lootCreator;
+        if(_lootCreator == oldCreator) revert Errors.SameAddress();
+        
+        lootCreator = _lootCreator;
+
+        emit LootCreatorUpdated(oldCreator, _lootCreator);
     }
 
     /**

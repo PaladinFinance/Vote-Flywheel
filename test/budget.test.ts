@@ -46,6 +46,8 @@ describe('LootBudget contract tests', () => {
 
     let pal: IERC20
     let extraToken: IERC20
+    
+    let new_creator: SignerWithAddress
 
     const pal_budget = ethers.utils.parseEther("1200")
     const extra_budget = ethers.utils.parseEther("0.01")
@@ -57,7 +59,7 @@ describe('LootBudget contract tests', () => {
     before(async () => {
         await resetFork();
 
-        [admin, lootReserve, loot, otherUser] = await ethers.getSigners();
+        [admin, lootReserve, loot, otherUser, new_creator] = await ethers.getSigners();
 
         budgetFactory = await ethers.getContractFactory("LootBudget");
         creatorFactory = await ethers.getContractFactory("MockCreator");
@@ -355,6 +357,44 @@ describe('LootBudget contract tests', () => {
 
             await expect(
                 budget.connect(loot).setExtraWeeklyLimit(new_limit)
+            ).to.be.reverted
+
+        });
+
+    });
+    
+    describe('updateLootCreator', async () => {
+
+        it(' should update the parameter correctly', async () => {
+
+            const tx = await budget.connect(admin).updateLootCreator(new_creator.address)
+
+            expect(await budget.lootCreator()).to.be.eq(new_creator.address)
+            
+            expect(tx).to.emit(budget, 'LootCreatorUpdated').withArgs(lootCreator.address, new_creator.address)
+
+        });
+
+        it(' should fail if given incorrect parameters', async () => {
+
+            await expect(
+                budget.connect(admin).updateLootCreator(ethers.constants.AddressZero)
+            ).to.be.revertedWith("InvalidParameter")
+
+            await expect(
+                budget.connect(admin).updateLootCreator(lootCreator.address)
+            ).to.be.revertedWith("SameAddress")
+
+        });
+
+        it(' should only be allowed for owner', async () => {
+
+            await expect(
+                budget.connect(otherUser).updateLootCreator(new_creator.address)
+            ).to.be.reverted
+            
+            await expect(
+                budget.connect(new_creator).updateLootCreator(new_creator.address)
             ).to.be.reverted
 
         });

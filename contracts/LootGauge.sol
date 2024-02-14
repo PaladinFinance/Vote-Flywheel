@@ -35,7 +35,7 @@ contract LootGauge is Owner, ReentrancyGuard {
     address immutable public extraToken;
     
     /** @notice Address of the Loot Creator contract */
-    address immutable public lootCreator;
+    address public lootCreator;
     /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
 
@@ -47,6 +47,8 @@ contract LootGauge is Owner, ReentrancyGuard {
 
     /** @notice Event emitted when the Budget Controller address is set */
     event BudgetControllerSet(address indexed budgetController);
+    /** @notice Event emitted when the Loot Creator address is updated */
+    event LootCreatorUpdated(address oldCreator, address newCreator);
 
 
     // Constructor
@@ -124,6 +126,22 @@ contract LootGauge is Owner, ReentrancyGuard {
 
         // Notify the LootCreator of the new budget
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);
+    }
+
+    /**
+    * @notice Updates the Loot Creator contract address
+    * @dev Updates the Loot Creator contract address
+    * @param _lootCreator Address of the new Loot Creator contract
+    */
+    function updateLootCreator(address _lootCreator) external onlyOwner {
+        if(_lootCreator == address(0)) revert Errors.InvalidParameter();
+
+        address oldCreator = lootCreator;
+        if(_lootCreator == oldCreator) revert Errors.SameAddress();
+        
+        lootCreator = _lootCreator;
+
+        emit LootCreatorUpdated(oldCreator, _lootCreator);
     }
 
 }
