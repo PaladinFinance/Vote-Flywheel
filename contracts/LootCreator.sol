@@ -61,6 +61,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address gauge;
         uint256 userPower;
         uint256 totalPower;
+        uint256 totalRewards;
         uint256 lockedRatio;
         uint256 rewardRatio;
         uint256 totalRatio;
@@ -505,12 +506,15 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
         vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
 
+        vars.totalRewards = totalQuestPeriodRewards[distributor][questId][period];
+        if(vars.totalRewards == 0) return;
+
         vars.userPeriodRewards = userQuestPeriodRewards[distributor][questId][period][user];
         if(vars.userPeriodRewards == 0) return;
 
         // Calculate ratios based on that
         vars.lockedRatio = vars.totalPower == 0 ? 0 : (vars.userPower * UNIT) / vars.totalPower; // prevent revert if no more hPAL Locked
-        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[distributor][questId][period];
+        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / vars.totalRewards;
         if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
 
         vars.userMultiplier = (vars.totalRatio * MAX_MULTIPLIER) / UNIT;
