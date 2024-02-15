@@ -501,6 +501,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // Get Quest allocation
         Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, questId, distributor, period);
+        if(allocation.palPerVote == 0 && allocation.extraPerVote == 0) return;
 
         // Get user boost power and total power
         vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
