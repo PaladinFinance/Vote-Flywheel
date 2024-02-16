@@ -17,6 +17,7 @@ import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
 import {Loot} from "./Loot.sol";
 import {MultiMerkleDistributorV2} from "./MultiMerkleDistributorV2.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./utils/Owner.sol";
 import "./libraries/Errors.sol";
 
@@ -415,6 +416,14 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         return IQuestBoard(board).quests(questId).gauge;
     }
 
+    function _formatRewardAmount(address token, uint256 amount) internal view returns(uint256) {
+        if(token == address(0)) return amount;
+        uint256 decimals = IERC20Metadata(token).decimals();
+        if(decimals == 18) return amount;
+        else if(decimals > 18) return amount / (10 ** (decimals - 18));
+        else return amount * (10 ** (18 - decimals));
+    }
+
     /**
     * @dev Returns the allocation of a Quest for a period based on the budget for a gauge & the number of Quests for the gauge for this period
     * @param gauge Address of the gauge
@@ -432,6 +441,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address board = MultiMerkleDistributorV2(distributor).questBoard();
         uint256 nbQuestForGauge = IQuestBoard(board).getQuestIdsForPeriodForGauge(gauge, period).length;
         uint256 questTotalRewards = totalQuestPeriodRewards[distributor][questId][period];
+        questTotalRewards = _formatRewardAmount(MultiMerkleDistributorV2(distributor).questRewardToken(questId), questTotalRewards);
 
         if(nbQuestForGauge == 0 || questTotalRewards == 0) return Allocation(0, 0);
 
@@ -509,6 +519,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         vars.userPeriodRewards = userQuestPeriodRewards[distributor][questId][period][user];
         if(vars.userPeriodRewards == 0) return;
+        vars.userPeriodRewards = _formatRewardAmount(MultiMerkleDistributorV2(distributor).questRewardToken(questId), vars.userPeriodRewards);
 
         // Calculate ratios based on that
         vars.lockedRatio = vars.totalPower == 0 ? 0 : (vars.userPower * UNIT) / vars.totalPower; // prevent revert if no more hPAL Locked

@@ -67,6 +67,8 @@ describe('LootCreator contract tests', () => {
     let pal: IERC20
     let extraToken: IERC20
 
+    let questRewardToken: IERC20
+
     let questGauge1: SignerWithAddress
     let questGauge2: SignerWithAddress
     let questGauge3: SignerWithAddress
@@ -93,6 +95,7 @@ describe('LootCreator contract tests', () => {
 
         pal = IERC20__factory.connect(PAL_ADDRESS, provider)
         extraToken = IERC20__factory.connect(EXTRA_ADDRESS, provider)
+        questRewardToken = IERC20__factory.connect("0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32", provider)
 
         await getERC20(admin, PAL_HOLDER, pal, admin.address, PAL_AMOUNT);
         await getERC20(admin, EXTRA_HOLDER, extraToken, admin.address, EXTRA_AMOUNT);
@@ -1160,6 +1163,8 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).addDistributor(distributor.address)
 
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
+
             await advanceTime(WEEK.toNumber())
 
             period = await creator.nextBudgetUpdatePeriod()
@@ -1605,6 +1610,8 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).addDistributor(distributor.address)
 
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
+
             await advanceTime(WEEK.toNumber())
 
             period = await creator.nextBudgetUpdatePeriod()
@@ -1890,6 +1897,8 @@ describe('LootCreator contract tests', () => {
             await creator.connect(admin).init(gauge.address)
 
             await creator.connect(admin).addDistributor(distributor.address)
+
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
 
             await advanceTime(WEEK.toNumber())
 
