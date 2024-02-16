@@ -269,8 +269,9 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         uint256 length = params.length;
         if(length == 0) revert Errors.EmptyParameters();
 
-        for(uint256 i; i < length; i++){
+        for(uint256 i; i < length;){
             _createLoot(user, params[i].distributor, params[i].questId, params[i].period);
+            unchecked { i++; }
         }
     }
 

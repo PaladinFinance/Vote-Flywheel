@@ -120,7 +120,9 @@ contract LootBudget is Owner, ReentrancyGuard {
         periodBudgetClaimed[currentPeriod] = true;
 
         // Send the budget to the LootReserve
-        IERC20(pal).safeTransfer(lootReserve, palAmount);
+        if(palAmount > 0) {
+            IERC20(pal).safeTransfer(lootReserve, palAmount);
+        }
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }
@@ -132,14 +134,14 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // Admin functions
 
-    function setPalWeeklyLimit(uint256 newLimit) external onlyOwner() {
+    function setPalWeeklyLimit(uint256 newLimit) external onlyOwner {
         uint256 oldLimit = palWeeklyLimit;
         palWeeklyLimit = newLimit;
 
         emit PalWeeklyLimitUpdated(oldLimit, newLimit);
     }
 
-    function setExtraWeeklyLimit(uint256 newLimit) external onlyOwner() {
+    function setExtraWeeklyLimit(uint256 newLimit) external onlyOwner {
         uint256 oldLimit = extraWeeklyLimit;
         extraWeeklyLimit = newLimit;
 
@@ -151,7 +153,7 @@ contract LootBudget is Owner, ReentrancyGuard {
     * @dev Updates the PAL weekly budget
     * @param newBudget new weekly budget amount
     */
-    function updatePalWeeklyBudget(uint256 newBudget) external onlyOwner() {
+    function updatePalWeeklyBudget(uint256 newBudget) external onlyOwner {
         if(newBudget > palWeeklyLimit) revert Errors.LootBudgetExceedLimit();
 
         uint256 oldBudget = palWeeklyBudget;
@@ -165,7 +167,7 @@ contract LootBudget is Owner, ReentrancyGuard {
     * @dev Updates the extra token weekly budget
     * @param newBudget new weekly budget amount
     */
-    function updateExtraWeeklyBudget(uint256 newBudget) external onlyOwner() {
+    function updateExtraWeeklyBudget(uint256 newBudget) external onlyOwner {
         if(newBudget > extraWeeklyLimit) revert Errors.LootBudgetExceedLimit();
 
         uint256 oldBudget = extraWeeklyBudget;

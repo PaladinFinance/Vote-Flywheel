@@ -117,9 +117,11 @@ contract LootGauge is Owner, ReentrancyGuard {
     * @param palAmount Amount of PAL to send
     * @param extraAmount Amount of extra token to send
     */
-    function sendLootBudget(uint256 palAmount, uint256 extraAmount) external nonReentrant onlyOwner() {
+    function sendLootBudget(uint256 palAmount, uint256 extraAmount) external onlyOwner {
         // Send the budget to the LootReserve
-        IERC20(pal).safeTransfer(lootReserve, palAmount);
+        if(palAmount > 0) {
+            IERC20(pal).safeTransfer(lootReserve, palAmount);
+        }
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }

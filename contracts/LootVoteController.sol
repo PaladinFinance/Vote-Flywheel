@@ -92,7 +92,7 @@ contract LootVoteController is Owner, ILootVoteController {
     // Storage
 
     /** @notice Address of the hPalPower contract */
-    address public hPalPower;
+    address public immutable hPalPower;
 
     /** @notice Next ID to list Boards */
     uint256 public nextBoardId; // ID 0 == no ID/not set
@@ -189,6 +189,9 @@ contract LootVoteController is Owner, ILootVoteController {
     event RemoveProxyManager(address indexed user, address indexed manager);
     /** @notice Event emitted when a Proxy Voter is set */
     event SetNewProxyVoter(address indexed user, address indexed proxyVoter, uint256 maxPower, uint256 endTimestamp);
+    
+    /** @notice Event emitted when the default gauge cap is updated */
+    event DefaultCapUpdated(uint256 newCap);
 
 
     // Constructor
@@ -198,7 +201,7 @@ contract LootVoteController is Owner, ILootVoteController {
 
         hPalPower = _hPalPower;
 
-        nextBoardId++;
+        nextBoardId = 1;
 
         timeTotal = (block.timestamp) / WEEK * WEEK;
     }
@@ -320,7 +323,7 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external {
+    function voteForManyGaugeWeights(address[] calldata gauge, uint256[] calldata userPower) external {
         // Clear any expired past Proxy
         _clearExpiredProxies(msg.sender);
 
@@ -358,7 +361,7 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external {
+    function voteForManyGaugeWeightsFor(address user, address[] calldata gauge, uint256[] calldata userPower) external {
         // Clear any expired past Proxy
         _clearExpiredProxies(user);
 
@@ -370,9 +373,10 @@ contract LootVoteController is Owner, ILootVoteController {
         uint256 length = gauge.length;
         if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
-        for(uint256 i; i < length; i++) {
+        for(uint256 i; i < length;) {
             totalPower += userPower[i];
             _voteForGauge(user, gauge[i], userPower[i], msg.sender);
+            unchecked { i++; }
         }
         if(totalPower > proxyState.maxPower) revert Errors.VotingPowerProxyExceeded();
     }
@@ -803,6 +807,18 @@ contract LootVoteController is Owner, ILootVoteController {
 
         emit GaugeCapUpdated(gauge, gaugeToBoardId[gauge], newCap);
     }
+
+    /**
+    * @notice Updates the default weight cap
+    * @dev Updates the default weight cap
+    * @param newCap New default weight cap
+    */
+    function updateDefaultGaugeCap(uint256 newCap) external onlyOwner {
+        defaultCap = newCap;
+
+        emit DefaultCapUpdated(newCap);
+    }
+
 
     /**
     * @notice Kills a gauge
