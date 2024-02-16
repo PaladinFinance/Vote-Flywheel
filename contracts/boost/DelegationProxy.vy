@@ -12,6 +12,7 @@ interface HolyPalPower:
 
     def totalLocked() -> uint256: view
     def totalLockedAt(blockNumber: uint256) -> uint256: view
+    def findTotalLockedAt(period: uint256) -> uint256: view
 
 
 interface VeDelegation: # Boost V2
@@ -122,6 +123,12 @@ def total_locked_at(_blockNumber: uint256) -> uint256:
     @return Ttoal hPAL locked
     """
     return HolyPalPower(HOLY_PAL_POWER).totalLockedAt(_blockNumber)
+
+
+@view
+@external
+def find_total_locked_at(_period: uint256) -> uint256:
+    return HolyPalPower(HOLY_PAL_POWER).findTotalLockedAt(_period)
 
 
 @external

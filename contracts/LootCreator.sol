@@ -104,9 +104,6 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     /** @notice Was the gauge allocated a Budget for each period */
     mapping(address => mapping(uint256 => bool)) public isGaugeAllocatedForPeriod;
 
-    /** @notice Checkpointed block number for each period */
-    mapping(uint256 => uint256) public periodBlockCheckpoint;
-
     /** @notice Total Rewards distributed for a period for a Quest */
     // distributor -> id -> period -> total
     mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public totalQuestPeriodRewards;
@@ -461,24 +458,24 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     function _updatePeriod() internal {
         if(block.timestamp < nextBudgetUpdatePeriod) return;
 
-        // Save the current block number for checkpointing
-        periodBlockCheckpoint[nextBudgetUpdatePeriod] = block.number;
+        while (nextBudgetUpdatePeriod <= block.timestamp) {
 
-        // Update the current period budget
-        Budget memory pending = pengingBudget;
-        pengingBudget = Budget(0, 0);
+            // Update the current period budget
+            Budget memory pending = pengingBudget;
+            pengingBudget = Budget(0, 0);
 
-        // 2 weeks difference to not impact the current distribution and allocations
-        uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
-        Budget memory previousBudget = periodBudget[lastFinishedPeriod];
-        Budget memory previousSpent = allocatedBudgetHistory[lastFinishedPeriod];
-        pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
-        pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
+            // 2 weeks difference to not impact the current distribution and allocations
+            uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
+            Budget memory previousBudget = periodBudget[lastFinishedPeriod];
+            Budget memory previousSpent = allocatedBudgetHistory[lastFinishedPeriod];
+            pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
+            pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
 
-        // Save the new set budget
-        periodBudget[nextBudgetUpdatePeriod] = pending;
+            // Save the new set budget
+            periodBudget[nextBudgetUpdatePeriod] = pending;
 
-        nextBudgetUpdatePeriod += WEEK;
+            nextBudgetUpdatePeriod += WEEK;
+        }
     }
 
     /**
@@ -505,7 +502,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // Get user boost power and total power
         vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
-        vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
+        vars.totalPower = IHolyPowerDelegation(holyPower).find_total_locked_at(period);
 
         vars.totalRewards = totalQuestPeriodRewards[distributor][questId][period];
         if(vars.totalRewards == 0) return;

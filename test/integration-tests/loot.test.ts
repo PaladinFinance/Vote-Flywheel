@@ -465,8 +465,6 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(await creator.totalQuestPeriodSet(distributor2.address, quest_id2, closed_period)).to.be.true
 
             expect(await creator.nextBudgetUpdatePeriod()).to.be.eq(prev_budget_period.add(WEEK))
-            expect(await creator.periodBlockCheckpoint(prev_budget_period)).to.be.eq(tx_block)
-
             const period_budget = await creator.periodBudget(closed_period)
 
             const gauge_weight = await controller["getGaugeRelativeWeight(address,uint256)"](VALID_GAUGES[0].gauge, closed_period)
@@ -580,8 +578,8 @@ describe('Loot - Voting & Loot creation tests', () => {
             const prev_user_loot_count = (await loot.getAllUserLoot(voter1.address)).length
 
             const user_pal_power = await proxy.adjusted_balance_of_at(voter1.address, closed_period)
-            const total_pal_power = await proxy.total_locked_at(
-                await creator.periodBlockCheckpoint(closed_period)
+            const total_pal_power = await proxy.find_total_locked_at(
+                closed_period
             )
 
             const expcted_user_ratio = user_pal_power.mul(UNIT).div(total_pal_power).mul(UNIT).div(

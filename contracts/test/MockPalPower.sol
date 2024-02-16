@@ -22,6 +22,7 @@ contract MockPalPower {
 
     uint256 public totalLocked;
     mapping(uint256 => uint256) public totalLockedAt;
+    mapping(uint256 => uint256) public totalLockedAtTs;
     
     function setTotalSupply(uint256 amount) external {
         totalSupply = amount;
@@ -69,5 +70,13 @@ contract MockPalPower {
 
     function getUserPointAt(address user, uint256 timestamp) external view returns(Point memory) {
         return userPointAt[user][timestamp];
+    }
+
+    function findTotalLockedAt(uint256 timestamp) external view returns(uint256) {
+        return totalLockedAtTs[timestamp];
+    }
+    
+    function setTotalLockedAtTs(uint256 timestamp, uint256 amount) external {
+        totalLockedAtTs[timestamp] = amount;
     }
 }

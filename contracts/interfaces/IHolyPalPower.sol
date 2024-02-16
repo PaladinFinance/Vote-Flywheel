@@ -32,4 +32,6 @@ interface IHolyPalPower {
 
     function totalLockedAt(uint256 blockNumber) external view returns(uint256);
 
+    function findTotalLockedAt(uint256 timestamp) external view returns(uint256);
+
 }

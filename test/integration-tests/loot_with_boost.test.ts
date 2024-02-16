@@ -466,8 +466,8 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
             const prev_user_loot_count = (await loot.getAllUserLoot(user3.address)).length
 
             const user_pal_power = await proxy.adjusted_balance_of_at(user3.address, closed_period)
-            const total_pal_power = await proxy.total_locked_at(
-                await creator.periodBlockCheckpoint(closed_period)
+            const total_pal_power = await proxy.find_total_locked_at(
+                closed_period
             )
 
             const expcted_user_ratio = user_pal_power.mul(UNIT).div(total_pal_power).mul(UNIT).div(

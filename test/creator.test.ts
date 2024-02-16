@@ -503,7 +503,6 @@ describe('LootCreator contract tests', () => {
             const prev_period = await creator.nextBudgetUpdatePeriod()
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -512,8 +511,6 @@ describe('LootCreator contract tests', () => {
             const new_pending_budget = await creator.pengingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -535,7 +532,6 @@ describe('LootCreator contract tests', () => {
             period = prev_period.sub(WEEK)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -548,8 +544,6 @@ describe('LootCreator contract tests', () => {
             const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -571,7 +565,6 @@ describe('LootCreator contract tests', () => {
             period = prev_period.sub(WEEK)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -584,8 +577,6 @@ describe('LootCreator contract tests', () => {
             const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -652,7 +643,6 @@ describe('LootCreator contract tests', () => {
             expect(past_period_allocated.extraAmount).not.to.be.eq(0)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -669,8 +659,6 @@ describe('LootCreator contract tests', () => {
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount.add(
                 past_period_budget.extraAmount.sub(past_period_allocated.extraAmount)
             ))
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -736,7 +724,6 @@ describe('LootCreator contract tests', () => {
             const tx_block = (await tx).blockNumber
 
             expect(await creator.nextBudgetUpdatePeriod()).to.be.eq(prev_period.add(WEEK))
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -1210,8 +1197,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
@@ -1657,8 +1644,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
@@ -1690,8 +1677,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards2
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period2),
+            await power.connect(admin).setTotalLockedAtTs(
+                period2,
                 total_hPal_power2
             )
 
@@ -1723,8 +1710,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards3
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period3),
+            await power.connect(admin).setTotalLockedAtTs(
+                period3,
                 total_hPal_power3
             )
 
@@ -1941,8 +1928,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
