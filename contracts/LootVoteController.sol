@@ -554,7 +554,7 @@ contract LootVoteController is Owner, ILootVoteController {
 
         // Check the gauge is listed & the user lock is not expired
         if(!_isGaugeListed(gauge)) revert Errors.NotListed();
-        if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
+        if(vars.userLockEnd <= vars.nextPeriod) revert Errors.LockExpired();
         // Check the user has enough voting power & the cooldown is respected
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
