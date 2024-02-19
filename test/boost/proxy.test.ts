@@ -299,66 +299,132 @@ describe('Delegation Proxy contract tests', () => {
 
     });
 
-    describe('commit_set_admins', async () => {
+    describe('commit_ownership_admin', async () => {
 
-        it(' should set the future admins correctly', async () => {
+        it(' should set the future admin correctly', async () => {
             
-            expect(await proxy.future_emergency_admin()).to.be.eq(ethers.constants.AddressZero)
             expect(await proxy.future_ownership_admin()).to.be.eq(ethers.constants.AddressZero)
 
-            const update_tx = await proxy.connect(admin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
+            const update_tx = await proxy.connect(admin).commit_ownership_admin(new_admin.address)
             
-            expect(await proxy.future_emergency_admin()).to.be.eq(new_emergencyAdmin.address)
             expect(await proxy.future_ownership_admin()).to.be.eq(new_admin.address)
 
-            expect(update_tx).to.emit(proxy, "CommitAdmins").withArgs(new_admin.address, new_emergencyAdmin.address);
+            expect(update_tx).to.emit(proxy, "CommitOwnershipAdmin").withArgs(new_admin.address);
 
         });
 
         it(' should only be allowed for ownership admin', async () => {
 
             await expect(
-                proxy.connect(emergencyAdmin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
+                proxy.connect(emergencyAdmin).commit_ownership_admin(new_admin.address)
             ).to.be.reverted
 
             await expect(
-                proxy.connect(otherUser).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
+                proxy.connect(otherUser).commit_ownership_admin(new_admin.address)
             ).to.be.reverted
 
         });
 
     });
 
-    describe('apply_set_admins', async () => {
+    describe('commit_emergency_admin', async () => {
 
-        beforeEach(async () => {
+        it(' should set the future admin correctly', async () => {
+            
+            expect(await proxy.future_emergency_admin()).to.be.eq(ethers.constants.AddressZero)
 
-            await proxy.connect(admin).commit_set_admins(new_admin.address, new_emergencyAdmin.address)
+            const update_tx = await proxy.connect(admin).commit_emergency_admin(new_emergencyAdmin.address)
+            
+            expect(await proxy.future_emergency_admin()).to.be.eq(new_emergencyAdmin.address)
 
-        });
-
-        it(' should apply the new admins', async () => {
-
-            expect(await proxy.ownership_admin()).to.be.eq(admin.address)
-            expect(await proxy.emergency_admin()).to.be.eq(emergencyAdmin.address)
-
-            const update_tx = await proxy.connect(admin).apply_set_admins()
-
-            expect(await proxy.ownership_admin()).to.be.eq(new_admin.address)
-            expect(await proxy.emergency_admin()).to.be.eq(new_emergencyAdmin.address)
-
-            expect(update_tx).to.emit(proxy, "ApplyAdmins").withArgs(new_admin.address, new_emergencyAdmin.address);
+            expect(update_tx).to.emit(proxy, "CommitEmergencyAdmin").withArgs(new_emergencyAdmin.address);
 
         });
 
         it(' should only be allowed for ownership admin', async () => {
 
             await expect(
-                proxy.connect(emergencyAdmin).apply_set_admins()
+                proxy.connect(emergencyAdmin).commit_emergency_admin(new_emergencyAdmin.address)
             ).to.be.reverted
 
             await expect(
-                proxy.connect(otherUser).apply_set_admins()
+                proxy.connect(otherUser).commit_emergency_admin(new_emergencyAdmin.address)
+            ).to.be.reverted
+
+        });
+
+    });
+
+    describe('apply_ownership_admin', async () => {
+
+        beforeEach(async () => {
+
+            await proxy.connect(admin).commit_ownership_admin(new_admin.address)
+
+        });
+
+        it(' should apply the new admin', async () => {
+
+            expect(await proxy.ownership_admin()).to.be.eq(admin.address)
+
+            const update_tx = await proxy.connect(new_admin).apply_ownership_admin()
+
+            expect(await proxy.ownership_admin()).to.be.eq(new_admin.address)
+
+            expect(update_tx).to.emit(proxy, "ApplyOwnershipAdmin").withArgs(new_admin.address);
+
+        });
+
+        it(' should only be allowed for new ownership admin', async () => {
+
+            await expect(
+                proxy.connect(admin).apply_ownership_admin()
+            ).to.be.reverted
+
+            await expect(
+                proxy.connect(emergencyAdmin).apply_ownership_admin()
+            ).to.be.reverted
+
+            await expect(
+                proxy.connect(otherUser).apply_ownership_admin()
+            ).to.be.reverted
+
+        });
+
+    });
+
+    describe('apply_emergency_admin', async () => {
+
+        beforeEach(async () => {
+
+            await proxy.connect(admin).commit_emergency_admin(new_emergencyAdmin.address)
+
+        });
+
+        it(' should apply the new admin', async () => {
+
+            expect(await proxy.emergency_admin()).to.be.eq(emergencyAdmin.address)
+
+            const update_tx = await proxy.connect(new_emergencyAdmin).apply_emergency_admin()
+
+            expect(await proxy.emergency_admin()).to.be.eq(new_emergencyAdmin.address)
+
+            expect(update_tx).to.emit(proxy, "ApplyEmergencyAdmin").withArgs(new_emergencyAdmin.address);
+
+        });
+
+        it(' should only be allowed for new emergency admin', async () => {
+
+            await expect(
+                proxy.connect(admin).apply_emergency_admin()
+            ).to.be.reverted
+
+            await expect(
+                proxy.connect(emergencyAdmin).apply_emergency_admin()
+            ).to.be.reverted
+
+            await expect(
+                proxy.connect(otherUser).apply_emergency_admin()
             ).to.be.reverted
 
         });
