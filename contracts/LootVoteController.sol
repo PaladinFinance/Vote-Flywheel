@@ -42,6 +42,9 @@ contract LootVoteController is Owner, ILootVoteController {
     /** @notice Max number of votes an user can vote at once */
     uint256 private constant MAX_VOTE_LENGTH = 10;
 
+    /** @notice Max number of proxies an user can have at once */
+    uint256 private constant MAX_PROXY_LENGTH = 50;
+
 
     // Structs
 
@@ -460,6 +463,7 @@ contract LootVoteController is Owner, ILootVoteController {
     function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external {
         if(!isProxyManager[user][msg.sender] && msg.sender != user) revert Errors.NotAllowedManager();
         if(maxPower == 0 || maxPower > MAX_BPS) revert Errors.VotingPowerInvalid();
+        if(currentUserProxyVoters[user].length + 1 > MAX_PROXY_LENGTH) revert Errors.MaxProxyListExceeded();
 
         // Round down the end timestamp to weeks & check the user Lock is not expired then
         endTimestamp = endTimestamp / WEEK * WEEK;

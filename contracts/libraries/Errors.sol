@@ -52,6 +52,7 @@ library Errors {
     error ProxyPowerExceeded();
     error NotAllowedVoteChange();
     error MaxVoteListExceeded();
+    error MaxProxyListExceeded();
 
     // Loot
     error CreatorAlreadySet();
