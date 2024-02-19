@@ -299,6 +299,17 @@ describe('LootVoteController contract tests', () => {
 
         });
 
+        it(' should fail if the Distributor is already listed with another Board', async () => {
+
+            await expect(
+                controller.connect(admin).updateDistributor(
+                    board3.address,
+                    distributor2.address,
+                )
+            ).to.be.revertedWith('AlreadyListed')
+
+        });
+
         it(' should fail if given invalid parameters', async () => {
 
             await expect(

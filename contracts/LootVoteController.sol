@@ -762,6 +762,7 @@ contract LootVoteController is Owner, ILootVoteController {
     */
     function updateDistributor(address board, address newDistributor) external onlyOwner {
         if(board == address(0) || newDistributor == address(0)) revert Errors.AddressZero();
+        if(distributorToId[newDistributor] != 0) revert Errors.AlreadyListed();
         
         uint256 boardId = boardToId[board];
         if(boardId == 0) revert Errors.InvalidParameter();
