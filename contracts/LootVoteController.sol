@@ -145,8 +145,12 @@ contract LootVoteController is Owner, ILootVoteController {
     uint256 public timeTotal;
 
     /** @notice Proxy Managers set for each user */
-    // user -> proxy voter -> bool
+    // user -> proxy manager -> bool
     mapping(address => mapping(address => bool)) public isProxyManager;
+
+    /** @notice Max Proxy duration allowed for Manager */
+    // user -> proxy manager -> uint256
+    mapping(address => mapping(address => uint256)) public maxProxyDuration;
 
     /** @notice State of Proxy Managers for each user */
     // user -> proxy voter -> state
@@ -430,13 +434,28 @@ contract LootVoteController is Owner, ILootVoteController {
     * @notice Approves a Proxy Manager for the caller
     * @dev Approves a Proxy Manager for the caller allowed to create Proxy on his voting power
     * @param manager Address of the Proxy Manager
+    * @param maxDuration Maximum Proxy duration allowed to be created by the Manager (can be set to 0 for no limit)
     */
-    function approveProxyManager(address manager) external {
+    function approveProxyManager(address manager, uint256 maxDuration) external {
         if(manager == address(0)) revert Errors.AddressZero();
 
         isProxyManager[msg.sender][manager] = true;
+        maxProxyDuration[msg.sender][manager] = maxDuration;
 
         emit SetProxyManager(msg.sender, manager);
+    }
+
+    /**
+    * @notice Updates the max duration allowed for a Proxy Manager
+    * @dev  Updates the max duration allowed for a Proxy Manager
+    * @param manager Address of the Proxy Manager
+    * @param newMaxDuration Maximum Proxy duration allowed to be created by the Manager (can be set to 0 for no limit)
+    */
+    function updateProxyManagerDuration(address manager, uint256 newMaxDuration) external {
+        if(manager == address(0)) revert Errors.AddressZero();
+        if(!isProxyManager[msg.sender][manager]) revert Errors.NotAllowedManager();
+
+        maxProxyDuration[msg.sender][manager] = newMaxDuration;
     }
 
     /**
@@ -469,6 +488,9 @@ contract LootVoteController is Owner, ILootVoteController {
         endTimestamp = endTimestamp / WEEK * WEEK;
         uint256 userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
         if(endTimestamp < block.timestamp || endTimestamp > userLockEnd) revert Errors.InvalidTimestamp();
+
+        uint256 maxDuration = maxProxyDuration[user][msg.sender];
+        if(maxDuration > 0 && endTimestamp > block.timestamp + maxDuration) revert Errors.ProxyDurationExceeded();
 
         // Clear any expired past Proxy
         _clearExpiredProxies(user);

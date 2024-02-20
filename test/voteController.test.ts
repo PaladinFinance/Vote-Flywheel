@@ -3072,9 +3072,27 @@ describe('LootVoteController contract tests', () => {
 
             expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
 
-            const tx = await controller.connect(user1).approveProxyManager(manager.address)
+            const tx = await controller.connect(user1).approveProxyManager(manager.address, 0)
 
             expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(0)
+
+            await expect(tx).to.emit(controller, 'SetProxyManager').withArgs(user1.address, manager.address)
+
+        });
+
+        it(' should set the correct maxDuration if given', async () => {
+
+            const maxDuration = WEEK.mul(4)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
+
+            const tx = await controller.connect(user1).approveProxyManager(manager.address, maxDuration)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(maxDuration)
 
             await expect(tx).to.emit(controller, 'SetProxyManager').withArgs(user1.address, manager.address)
 
@@ -3083,7 +3101,45 @@ describe('LootVoteController contract tests', () => {
         it(' should fail if given address 0x0', async () => {
 
             await expect(
-                controller.connect(user1).approveProxyManager(ethers.constants.AddressZero)
+                controller.connect(user1).approveProxyManager(ethers.constants.AddressZero, 0)
+            ).to.be.revertedWith('AddressZero')
+
+        });
+    
+    });
+
+    describe('updateProxyManagerDuration', async () => {
+
+        const newMaxDuration = WEEK.mul(4)
+
+        beforeEach(async () => {
+
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
+
+        });
+
+        it(' should update the max duration correctly', async () => {
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(0)
+
+            await controller.connect(user1).updateProxyManagerDuration(manager.address, newMaxDuration)
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(newMaxDuration)
+
+        });
+
+        it(' should fail if maanger is not allowed', async () => {
+
+            await expect(
+                controller.connect(user1).updateProxyManagerDuration(user1.address, newMaxDuration)
+            ).to.be.revertedWith('NotAllowedManager')
+
+        });
+
+        it(' should fail if given address 0x0', async () => {
+
+            await expect(
+                controller.connect(user1).updateProxyManagerDuration(ethers.constants.AddressZero, newMaxDuration)
             ).to.be.revertedWith('AddressZero')
 
         });
@@ -3094,7 +3150,7 @@ describe('LootVoteController contract tests', () => {
 
         beforeEach(async () => {
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -3221,7 +3277,7 @@ describe('LootVoteController contract tests', () => {
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
             await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -3395,6 +3451,20 @@ describe('LootVoteController contract tests', () => {
             ).to.be.revertedWith('NotAllowedManager')
         });
 
+        it(' should fail if endTimestamp exceeds the allowed max duration for manager', async () => {
+
+            const maxDuration = WEEK.mul(4)
+
+            await controller.connect(user1).updateProxyManagerDuration(manager.address, maxDuration)
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await expect(
+                controller.connect(manager).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(WEEK)))
+            ).to.be.revertedWith('ProxyDurationExceeded')
+        });
+
         it(' should fail if given an invalid vote power', async () => {
 
             let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
@@ -3543,7 +3613,7 @@ describe('LootVoteController contract tests', () => {
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
             await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
             await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
             await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power2, current_ts.add(proxy_duration2))
@@ -3719,7 +3789,7 @@ describe('LootVoteController contract tests', () => {
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -4123,7 +4193,7 @@ describe('LootVoteController contract tests', () => {
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 

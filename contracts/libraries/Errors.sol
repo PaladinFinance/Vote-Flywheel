@@ -50,6 +50,7 @@ library Errors {
     error ExpiredProxy();
     error ProxyAlreadyActive();
     error ProxyPowerExceeded();
+    error ProxyDurationExceeded();
     error NotAllowedVoteChange();
     error MaxVoteListExceeded();
     error MaxProxyListExceeded();

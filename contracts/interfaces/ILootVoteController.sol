@@ -32,7 +32,8 @@ interface ILootVoteController {
 	function updateGaugeWeight(address gauge) external;
     function updateTotalWeight() external;
 
-    function approveProxyManager(address manager) external;
+    function approveProxyManager(address manager, uint256 maxDuration) external;
+    function removeProxyManager(address manager) external;
     function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external;
     function clearUserExpiredProxies(address user) external;
 
