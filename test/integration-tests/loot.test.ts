@@ -234,7 +234,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             0,
             0,
             ethers.utils.parseEther("10000"),
-            ethers.utils.parseEther("50000")
+            ethers.utils.parseEther("10")
         )) as LootBudget
         await budget.deployed()
 
@@ -258,7 +258,7 @@ describe('Loot - Voting & Loot creation tests', () => {
         let board2_id: BigNumber
 
         const pal_budget = ethers.utils.parseEther("4500")
-        const extra_budget = ethers.utils.parseEther("12500")
+        const extra_budget = ethers.utils.parseEther("7.5")
 
         const vote_powers1 = [BigNumber.from(4000), BigNumber.from(2500), BigNumber.from(3500)]
         const vote_powers2 = [BigNumber.from(5000), BigNumber.from(1500), BigNumber.from(2500), BigNumber.from(1000)]
