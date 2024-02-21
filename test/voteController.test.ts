@@ -354,6 +354,64 @@ describe('LootVoteController contract tests', () => {
         });
     
     });
+    
+    describe('updateDefaultGaugeCap', async () => {
+
+        const new_default_cap = ethers.utils.parseEther("0.2")
+
+        it(' should update the default gauge cap correctly', async () => {
+
+            expect(await controller.defaultCap()).to.be.eq(DEFAULT_CAP)
+
+            const tx = await controller.connect(admin).updateDefaultGaugeCap(
+                new_default_cap
+            )
+            
+            expect(await controller.defaultCap()).to.be.eq(new_default_cap)
+
+            expect(tx).to.emit(controller, "DefaultCapUpdated").withArgs(new_default_cap)
+            
+        });
+
+        it(' should fail if the new given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    0
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+        });
+
+        it(' should only be allowed for admin', async () => {
+
+            await expect(
+                controller.connect(user1).updateDefaultGaugeCap(
+                    new_default_cap
+                )
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
+
+            await expect(
+                controller.connect(gauge1).updateDefaultGaugeCap(
+                    new_default_cap
+                )
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
+
+        });
+    
+    });
 
     describe('addNewGauge', async () => {
 
@@ -656,6 +714,26 @@ describe('LootVoteController contract tests', () => {
 
         });
 
+        it(' should fail if the given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).addNewGauge(
+                    gauge1.address,
+                    board1_id,
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).addNewGauge(
+                    gauge1.address,
+                    board1_id,
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+        });
+
         it(' should only be allowed for admin', async () => {
 
             await expect(
@@ -784,6 +862,24 @@ describe('LootVoteController contract tests', () => {
                     new_gauge1_cap
                 )
             ).to.be.revertedWith('AddressZero')
+
+        });
+
+        it(' should fail if the given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).updateGaugeCap(
+                    gauge1.address,
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateGaugeCap(
+                    gauge1.address,
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
 
         });
 

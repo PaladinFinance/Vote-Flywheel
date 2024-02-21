@@ -45,6 +45,9 @@ contract LootVoteController is Owner, ILootVoteController {
     /** @notice Max number of proxies an user can have at once */
     uint256 private constant MAX_PROXY_LENGTH = 50;
 
+    uint256 private constant MIN_GAUGE_CAP = 0.001 * 1e18; // 0.1%
+    uint256 private constant MAX_GAUGE_CAP = 1 * 1e18; // 100%
+
 
     // Structs
 
@@ -810,6 +813,7 @@ contract LootVoteController is Owner, ILootVoteController {
         if(gauge == address(0)) revert Errors.AddressZero();
         if(boardId == 0) revert Errors.InvalidParameter();
         if(_isGaugeListed(gauge)) revert Errors.AlreadyListed();
+        if((cap < MIN_GAUGE_CAP && cap != 0) || cap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
 
         gaugeToBoardId[gauge] = boardId;
         gaugeCaps[gauge] = cap;
@@ -829,6 +833,7 @@ contract LootVoteController is Owner, ILootVoteController {
         if(gauge == address(0)) revert Errors.AddressZero();
         if(gaugeToBoardId[gauge] == 0) revert Errors.InvalidParameter();
         if(isGaugeKilled[gauge]) revert Errors.KilledGauge();
+        if((newCap < MIN_GAUGE_CAP && newCap != 0) || newCap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
 
         gaugeCaps[gauge] = newCap;
 
@@ -841,6 +846,7 @@ contract LootVoteController is Owner, ILootVoteController {
     * @param newCap New default weight cap
     */
     function updateDefaultGaugeCap(uint256 newCap) external onlyOwner {
+        if(newCap < MIN_GAUGE_CAP || newCap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
         defaultCap = newCap;
 
         emit DefaultCapUpdated(newCap);

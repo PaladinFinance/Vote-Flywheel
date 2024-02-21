@@ -54,6 +54,7 @@ library Errors {
     error NotAllowedVoteChange();
     error MaxVoteListExceeded();
     error MaxProxyListExceeded();
+    error InvalidGaugeCap();
 
     // Loot
     error CreatorAlreadySet();
