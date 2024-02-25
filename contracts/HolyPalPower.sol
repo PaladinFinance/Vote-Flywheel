@@ -47,6 +47,8 @@ contract HolyPalPower is IHolyPalPower {
     // Constructor
 
     constructor(address _hPal) {
+        if( _hPal == address(0)) revert Errors.AddressZero();
+
         hPal = _hPal;
     }
 
@@ -155,6 +157,18 @@ contract HolyPalPower is IHolyPalPower {
     */
     function totalLockedAt(uint256 blockNumber) external view returns(uint256) {
         return IHolyPaladinToken(hPal).getPastTotalLock(blockNumber).total;
+    }
+
+    /**
+    * @notice Finds the total amount of hPAL locked at a given timestamp
+    * @dev Calculates the approximative block number for a given timestamp to find the total locked
+    * @param timestamp Timestamp to find the block number for
+    * @return uint256 : Total Supply found for the given timestamp
+    */
+    function findTotalLockedAt(uint256 timestamp) external view returns(uint256) {
+        return IHolyPaladinToken(hPal).getPastTotalLock(
+            _findBlockNumberForTimestamp(timestamp)
+        ).total;
     }
 
 

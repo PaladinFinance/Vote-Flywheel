@@ -17,6 +17,7 @@ import {IHolyPowerDelegation} from "./interfaces/IHolyPowerDelegation.sol";
 import {Loot} from "./Loot.sol";
 import {MultiMerkleDistributorV2} from "./MultiMerkleDistributorV2.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./utils/Owner.sol";
 import "./libraries/Errors.sol";
 
@@ -61,6 +62,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address gauge;
         uint256 userPower;
         uint256 totalPower;
+        uint256 totalRewards;
         uint256 lockedRatio;
         uint256 rewardRatio;
         uint256 totalRatio;
@@ -103,17 +105,17 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     /** @notice Was the gauge allocated a Budget for each period */
     mapping(address => mapping(uint256 => bool)) public isGaugeAllocatedForPeriod;
 
-    /** @notice Checkpointed block number for each period */
-    mapping(uint256 => uint256) public periodBlockCheckpoint;
-
     /** @notice Total Rewards distributed for a period for a Quest */
     // distributor -> id -> period -> total
     mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public totalQuestPeriodRewards;
     /** @notice Was the total reward set for a Quest period */
     mapping(address => mapping(uint256 => mapping(uint256 => bool))) public totalQuestPeriodSet;
-    /** @notice User claime damount for a Quest period */
+    /** @notice User claimed amount for a Quest period */
     // distributor -> id -> period -> user -> amount
     mapping(address => mapping(uint256 => mapping(uint256 => mapping(address => uint256)))) public userQuestPeriodRewards;
+    /** @notice User created Loot for a Quest period */
+    // distributor -> id -> period -> user -> bool
+    mapping(address => mapping(uint256 => mapping(uint256 => mapping(address => bool)))) public userQuestPeriodCreated;
 
 
     // Events
@@ -156,6 +158,12 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address _lootVoteController,
         address _holyPower
     ) {
+        if(
+            _loot == address(0)
+            || _lootVoteController == address(0)
+            || _holyPower == address(0)
+        ) revert Errors.AddressZero();
+
         loot = _loot;
         lootVoteController = _lootVoteController;
         holyPower = _holyPower;
@@ -246,6 +254,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param period Timestamp of the period
     */
     function createLoot(address user, address distributor, uint256 questId, uint256 period) external nonReentrant {
+        if(user == address(0)) revert Errors.AddressZero();
         _createLoot(user, distributor, questId, period);
     }
 
@@ -256,11 +265,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param params Quest claim parameters (distributor, questId, period)
     */
     function createMultipleLoot(address user, MultiCreate[] calldata params) external nonReentrant {
+        if(user == address(0)) revert Errors.AddressZero();
         uint256 length = params.length;
         if(length == 0) revert Errors.EmptyParameters();
 
-        for(uint256 i; i < length; i++){
+        for(uint256 i; i < length;){
             _createLoot(user, params[i].distributor, params[i].questId, params[i].period);
+            unchecked { i++; }
         }
     }
 
@@ -272,8 +283,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @param period Timestamp of the period
     * @param claimedAmount Amount of rewards claimed by the user
     */
-    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor nonReentrant {
-        userQuestPeriodRewards[msg.sender][questId][period][user] = claimedAmount;
+    function notifyQuestClaim(address user, uint256 questId, uint256 period, uint256 claimedAmount) external onlyAllowedDistributor {
+        userQuestPeriodRewards[msg.sender][questId][period][user] += claimedAmount;
     }
 
     /**
@@ -311,13 +322,18 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // If the gauge weight is higher than the cap, we need to handle the un-allocated rewards
         if(gaugeWeight > gaugeCap) {
-            uint256 unsunedWeight = gaugeWeight - gaugeCap;
+            uint256 unusedWeight = gaugeWeight - gaugeCap;
 
             gaugeWeight = gaugeCap;
 
             // Handle un-allocated budget => set it as pending for next periods
-            pengingBudget.palAmount += uint128(uint256(budget.palAmount) * unsunedWeight / UNIT);
-            pengingBudget.extraAmount += uint128(uint256(budget.extraAmount) * unsunedWeight / UNIT);
+            uint128 unusedPal = uint128(uint256(budget.palAmount) * unusedWeight / UNIT);
+            uint128 unusedExtra = uint128(uint256(budget.extraAmount) * unusedWeight / UNIT);
+
+            pengingBudget.palAmount += unusedPal;
+            pengingBudget.extraAmount += unusedExtra;
+            allocatedBudgetHistory[period].palAmount += unusedPal;
+            allocatedBudgetHistory[period].extraAmount += unusedExtra;
         }
 
         // Calculate the allocated budget for the gauge
@@ -335,13 +351,22 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         );
 
     }
+    /**
+    * @dev Notifies of the amount added to a Quest period via emergency update in Distributors
+    * @param questId ID of the Quest
+    * @param period Timestamp of the period
+    * @param addedRewards Amount added to the total
+    */
+    function notifyAddedRewardsQuestPeriod(uint256 questId, uint256 period, uint256 addedRewards) external onlyAllowedDistributor {
+        totalQuestPeriodRewards[msg.sender][questId][period] += addedRewards;
+    }
 
     /**
     * @notice Notifies of undistributed rewards
     * @dev Notifies the amount of rewards slashed from a claimed Loot & add them to the pending budget
     * @param palAmount Amount of PAL tokens slashed
     */
-	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot nonReentrant {
+	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot {
         // Add undistributed rewards from Loot to the pending budget
         pengingBudget.palAmount += uint128(palAmount);
     }
@@ -392,6 +417,14 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         return IQuestBoard(board).quests(questId).gauge;
     }
 
+    function _formatRewardAmount(address token, uint256 amount) internal view returns(uint256) {
+        if(token == address(0)) return amount;
+        uint256 decimals = IERC20Metadata(token).decimals();
+        if(decimals == 18) return amount;
+        else if(decimals > 18) return amount / (10 ** (decimals - 18));
+        else return amount * (10 ** (18 - decimals));
+    }
+
     /**
     * @dev Returns the allocation of a Quest for a period based on the budget for a gauge & the number of Quests for the gauge for this period
     * @param gauge Address of the gauge
@@ -409,6 +442,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address board = MultiMerkleDistributorV2(distributor).questBoard();
         uint256 nbQuestForGauge = IQuestBoard(board).getQuestIdsForPeriodForGauge(gauge, period).length;
         uint256 questTotalRewards = totalQuestPeriodRewards[distributor][questId][period];
+        questTotalRewards = _formatRewardAmount(MultiMerkleDistributorV2(distributor).questRewardToken(questId), questTotalRewards);
 
         if(nbQuestForGauge == 0 || questTotalRewards == 0) return Allocation(0, 0);
 
@@ -435,24 +469,24 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     function _updatePeriod() internal {
         if(block.timestamp < nextBudgetUpdatePeriod) return;
 
-        // Save the current block number for checkpointing
-        periodBlockCheckpoint[nextBudgetUpdatePeriod] = block.number;
+        while (nextBudgetUpdatePeriod <= block.timestamp) {
 
-        // Update the current period budget
-        Budget memory pending = pengingBudget;
-        pengingBudget = Budget(0, 0);
+            // Update the current period budget
+            Budget memory pending = pengingBudget;
+            pengingBudget = Budget(0, 0);
 
-        // 2 weeks difference to not impact the current distribution and allocations
-        uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
-        Budget memory previousBudget = periodBudget[lastFinishedPeriod];
-        Budget memory previousSpent = allocatedBudgetHistory[lastFinishedPeriod];
-        pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
-        pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
+            // 2 weeks difference to not impact the current distribution and allocations
+            uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
+            Budget memory previousBudget = periodBudget[lastFinishedPeriod];
+            Budget memory previousSpent = allocatedBudgetHistory[lastFinishedPeriod];
+            pending.palAmount += previousBudget.palAmount - previousSpent.palAmount;
+            pending.extraAmount += previousBudget.extraAmount - previousSpent.extraAmount;
 
-        // Save the new set budget
-        periodBudget[nextBudgetUpdatePeriod] = pending;
+            // Save the new set budget
+            periodBudget[nextBudgetUpdatePeriod] = pending;
 
-        nextBudgetUpdatePeriod += WEEK;
+            nextBudgetUpdatePeriod += WEEK;
+        }
     }
 
     /**
@@ -469,19 +503,28 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         vars.gauge = _getQuestGauge(questId, distributor);
         if(!ILootVoteController(lootVoteController).isListedGauge(vars.gauge)) return;
 
+        // Prevent from creating again a Loot for the same Quest period
+        if(userQuestPeriodCreated[distributor][questId][period][user]) return;
+        userQuestPeriodCreated[distributor][questId][period][user] = true;
+
         // Get Quest allocation
         Allocation memory allocation = _getQuestAllocationForPeriod(vars.gauge, questId, distributor, period);
+        if(allocation.palPerVote == 0 && allocation.extraPerVote == 0) return;
 
         // Get user boost power and total power
         vars.userPower = IHolyPowerDelegation(holyPower).adjusted_balance_of_at(user, period);
-        vars.totalPower = IHolyPowerDelegation(holyPower).total_locked_at(periodBlockCheckpoint[period]);
+        vars.totalPower = IHolyPowerDelegation(holyPower).find_total_locked_at(period);
+
+        vars.totalRewards = totalQuestPeriodRewards[distributor][questId][period];
+        if(vars.totalRewards == 0) return;
 
         vars.userPeriodRewards = userQuestPeriodRewards[distributor][questId][period][user];
         if(vars.userPeriodRewards == 0) return;
+        vars.userPeriodRewards = _formatRewardAmount(MultiMerkleDistributorV2(distributor).questRewardToken(questId), vars.userPeriodRewards);
 
         // Calculate ratios based on that
-        vars.lockedRatio = (vars.userPower * UNIT) / vars.totalPower;
-        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / totalQuestPeriodRewards[distributor][questId][period];
+        vars.lockedRatio = vars.totalPower == 0 ? 0 : (vars.userPower * UNIT) / vars.totalPower; // prevent revert if no more hPAL Locked
+        vars.rewardRatio = (vars.userPeriodRewards * UNIT) / vars.totalRewards;
         if(vars.rewardRatio > 0) vars.totalRatio = (vars.lockedRatio * UNIT) / vars.rewardRatio;
 
         vars.userMultiplier = (vars.totalRatio * MAX_MULTIPLIER) / UNIT;

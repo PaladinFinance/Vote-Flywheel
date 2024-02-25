@@ -38,6 +38,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 extraAmount;
         // Timestamp at which the vesting starts
         uint256 startTs;
+        // Timestamp at which the vesting starts
+        uint256 endTs;
         // Flag to check if the Loot has been claimed
         bool claimed;
     }
@@ -93,6 +95,12 @@ contract Loot is Owner, ReentrancyGuard {
         address _tokenReserve,
         uint256 _vestingDuration
     ){
+        if(
+            _pal == address(0)
+            || _extraToken == address(0)
+            || _tokenReserve == address(0)
+        ) revert Errors.AddressZero();
+
         pal = IERC20(_pal);
         extraToken = IERC20(_extraToken);
         tokenReserve = _tokenReserve;
@@ -134,7 +142,7 @@ contract Loot is Owner, ReentrancyGuard {
         palAmount = loot.palAmount;
         extraAmount = loot.extraAmount;
         startTs = loot.startTs;
-        endTs = loot.startTs + vestingDuration;
+        endTs = loot.endTs;
         claimed = loot.claimed;
     }
 
@@ -163,11 +171,12 @@ contract Loot is Owner, ReentrancyGuard {
     * @return uint256[] : List of active Loot IDs
     */
     function getAllActiveUserLootIds(address user) external view returns(uint256[] memory){
-        uint256 length = userLoots[user].length;
+        LootData[] memory _loots = userLoots[user];
+        uint256 length = _loots.length;
         uint256 activeCount;
 
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) activeCount++;
+            if(!_loots[i].claimed) activeCount++;
             unchecked { i++; }
         }
 
@@ -175,8 +184,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256[] memory ids = new uint256[](activeCount);
         uint256 j;
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) {
-                ids[j] = userLoots[user][i].id;
+            if(!_loots[i].claimed) {
+                ids[j] = _loots[i].id;
                 unchecked { j++; }
             }
             unchecked { i++; }
@@ -202,11 +211,12 @@ contract Loot is Owner, ReentrancyGuard {
     * @return LootData[] : List of active Loots
     */
     function getAllActiveUserLoot(address user) external view returns(LootData[] memory){
-        uint256 length = userLoots[user].length;
+        LootData[] memory _loots = userLoots[user];
+        uint256 length = _loots.length;
         uint256 activeCount;
 
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) activeCount++;
+            if(!_loots[i].claimed) activeCount++;
             unchecked { i++; }
         }
 
@@ -214,8 +224,8 @@ contract Loot is Owner, ReentrancyGuard {
         LootData[] memory loots = new LootData[](activeCount);
         uint256 j;
         for(uint256 i; i < length;){
-            if(!userLoots[user][i].claimed) {
-                loots[j] = userLoots[user][i];
+            if(!_loots[i].claimed) {
+                loots[j] = _loots[i];
                 unchecked { j++; }
             }
             unchecked { i++; }
@@ -235,7 +245,7 @@ contract Loot is Owner, ReentrancyGuard {
     * @param palAmount Amount of PAL
     * @param extraAmount Amount of extra token
     */
-    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external nonReentrant onlyLootCreator {
+    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external onlyLootCreator {
         if(palAmount == 0 && extraAmount == 0) return;
 
         uint256 lootId = userLoots[user].length;
@@ -246,6 +256,7 @@ contract Loot is Owner, ReentrancyGuard {
             palAmount: palAmount,
             extraAmount: extraAmount,
             startTs: startTs,
+            endTs: startTs + vestingDuration,
             claimed: false
         }));
 
@@ -259,13 +270,13 @@ contract Loot is Owner, ReentrancyGuard {
     * @param receiver Address to receive the PAL & extra token
     */
     function claimLoot(uint256 id, address receiver) external nonReentrant {
-        if(id >= userLoots[msg.sender].length) revert Errors.InvalidId();
+        if(id >= userLoots[msg.sender].length) revert Errors.InvalidId(id);
         if(receiver == address(0)) revert Errors.AddressZero();
         // Load the Loot state
         LootData storage loot = userLoots[msg.sender][id];
 
         if(loot.claimed) revert Errors.AlreadyClaimed();
-        if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
+        if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted(id);
         loot.claimed = true;
 
         
@@ -273,9 +284,8 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 palAmount = loot.palAmount;
         if(palAmount > 0) {
             // Check if the Loot is still vesting, and slash the PAL amount if needed
-            uint256 vestingEndTs = loot.startTs + vestingDuration;
-            if(block.timestamp < vestingEndTs){
-                uint256 remainingVesting = vestingEndTs - block.timestamp;
+            if(block.timestamp < loot.endTs){
+                uint256 remainingVesting = loot.endTs - block.timestamp;
                 uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
                 // Notify the LootCreator of the slashed amount
@@ -286,12 +296,13 @@ contract Loot is Owner, ReentrancyGuard {
             // Transfer the PAL to the receiver
             pal.safeTransferFrom(tokenReserve, receiver, palAmount);
         }
-        if(loot.extraAmount > 0) {
+        uint256 extraAmount = loot.extraAmount;
+        if(extraAmount > 0) {
         // Transfer the extra token to the receiver
-            extraToken.safeTransferFrom(tokenReserve, receiver, loot.extraAmount);
+            extraToken.safeTransferFrom(tokenReserve, receiver, extraAmount);
         }
 
-        emit LootClaimed(msg.sender, id, palAmount, loot.extraAmount);
+        emit LootClaimed(msg.sender, id, palAmount, extraAmount);
     }
 
     /**
@@ -307,20 +318,20 @@ contract Loot is Owner, ReentrancyGuard {
         uint256 totalExtraAmount;
 
         for(uint256 i; i < length;){
-            if(ids[i] >= userLoots[msg.sender].length) revert Errors.InvalidId();
+            if(ids[i] >= userLoots[msg.sender].length) revert Errors.InvalidId(ids[i]);
             // Load the Loot state
             LootData storage loot = userLoots[msg.sender][ids[i]];
 
             if(loot.claimed) revert Errors.AlreadyClaimed();
-            if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted();
+            if(block.timestamp < loot.startTs) revert Errors.VestingNotStarted(ids[i]);
             loot.claimed = true;
 
             // Check if the Loot is still vesting, and slash the PAL amount if needed
             uint256 palAmount = loot.palAmount;
+            uint256 extraAmount = loot.extraAmount;
             if(palAmount > 0) {
-                uint256 vestingEndTs = loot.startTs + vestingDuration;
-                if(block.timestamp < vestingEndTs){
-                    uint256 remainingVesting = vestingEndTs - block.timestamp;
+                if(block.timestamp < loot.endTs){
+                    uint256 remainingVesting = loot.endTs - block.timestamp;
                     uint256 slashingAmount = palAmount * remainingVesting / vestingDuration;
 
                     // Notify the LootCreator of the slashed amount
@@ -332,9 +343,9 @@ contract Loot is Owner, ReentrancyGuard {
 
             // Sum up all the PAL & extra token to be transferred
             totalPalAmount += palAmount;
-            totalExtraAmount += loot.extraAmount;
+            totalExtraAmount += extraAmount;
 
-            emit LootClaimed(msg.sender, ids[i], palAmount, loot.extraAmount);
+            emit LootClaimed(msg.sender, ids[i], palAmount, extraAmount);
 
             unchecked { i++; }
         }

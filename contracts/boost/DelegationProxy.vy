@@ -12,6 +12,7 @@ interface HolyPalPower:
 
     def totalLocked() -> uint256: view
     def totalLockedAt(blockNumber: uint256) -> uint256: view
+    def findTotalLockedAt(period: uint256) -> uint256: view
 
 
 interface VeDelegation: # Boost V2
@@ -23,12 +24,16 @@ interface VeDelegation: # Boost V2
     def total_locked_at(block_number: uint256) -> uint256: view
 
 
-event CommitAdmins:
+event CommitOwnershipAdmin:
     ownership_admin: address
+
+event CommitEmergencyAdmin:
     emergency_admin: address
 
-event ApplyAdmins:
+event ApplyOwnershipAdmin:
     ownership_admin: address
+
+event ApplyEmergencyAdmin:
     emergency_admin: address
 
 event DelegationSet:
@@ -48,6 +53,10 @@ future_ownership_admin: public(address)
 
 @external
 def __init__(_voting_escrow: address, _delegation: address, _o_admin: address, _e_admin: address):
+    assert _voting_escrow != ZERO_ADDRESS
+    assert _o_admin != ZERO_ADDRESS
+    assert _e_admin != ZERO_ADDRESS
+
     HOLY_PAL_POWER = _voting_escrow
 
     self.delegation = _delegation
@@ -120,6 +129,12 @@ def total_locked_at(_blockNumber: uint256) -> uint256:
     return HolyPalPower(HOLY_PAL_POWER).totalLockedAt(_blockNumber)
 
 
+@view
+@external
+def find_total_locked_at(_period: uint256) -> uint256:
+    return HolyPalPower(HOLY_PAL_POWER).findTotalLockedAt(_period)
+
+
 @external
 def kill_delegation():
     """
@@ -149,30 +164,52 @@ def set_delegation(_delegation: address):
 
 
 @external
-def commit_set_admins(_o_admin: address, _e_admin: address):
+def commit_ownership_admin(_o_admin: address):
     """
-    @notice Set ownership admin to `_o_admin` and emergency admin to `_e_admin`
+    @notice Set ownership admin to `_o_admin`
     @param _o_admin Ownership admin
-    @param _e_admin Emergency admin
     """
     assert msg.sender == self.ownership_admin, "Access denied"
 
     self.future_ownership_admin = _o_admin
-    self.future_emergency_admin = _e_admin
 
-    log CommitAdmins(_o_admin, _e_admin)
+    log CommitOwnershipAdmin(_o_admin)
 
 
 @external
-def apply_set_admins():
+def commit_emergency_admin(_e_admin: address):
     """
-    @notice Apply the effects of `commit_set_admins`
+    @notice Set emergency admin to `_e_admin`
+    @param _e_admin Emergency admin
     """
     assert msg.sender == self.ownership_admin, "Access denied"
 
+    self.future_emergency_admin = _e_admin
+
+    log CommitEmergencyAdmin(_e_admin)
+
+
+@external
+def apply_ownership_admin():
+    """
+    @notice Apply the effects of `commit_ownership_admins`
+    """
+    assert msg.sender == self.future_ownership_admin, "Access denied"
+
     _o_admin: address = self.future_ownership_admin
-    _e_admin: address = self.future_emergency_admin
     self.ownership_admin = _o_admin
+
+    log ApplyOwnershipAdmin(_o_admin)
+
+
+@external
+def apply_emergency_admin():
+    """
+    @notice Apply the effects of `commit_emergency_admin`
+    """
+    assert msg.sender == self.future_emergency_admin, "Access denied"
+
+    _e_admin: address = self.future_emergency_admin
     self.emergency_admin = _e_admin
 
-    log ApplyAdmins(_o_admin, _e_admin)
+    log ApplyEmergencyAdmin(_e_admin)

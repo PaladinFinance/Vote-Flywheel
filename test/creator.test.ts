@@ -67,6 +67,8 @@ describe('LootCreator contract tests', () => {
     let pal: IERC20
     let extraToken: IERC20
 
+    let questRewardToken: IERC20
+
     let questGauge1: SignerWithAddress
     let questGauge2: SignerWithAddress
     let questGauge3: SignerWithAddress
@@ -93,6 +95,7 @@ describe('LootCreator contract tests', () => {
 
         pal = IERC20__factory.connect(PAL_ADDRESS, provider)
         extraToken = IERC20__factory.connect(EXTRA_ADDRESS, provider)
+        questRewardToken = IERC20__factory.connect("0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32", provider)
 
         await getERC20(admin, PAL_HOLDER, pal, admin.address, PAL_AMOUNT);
         await getERC20(admin, EXTRA_HOLDER, extraToken, admin.address, EXTRA_AMOUNT);
@@ -503,7 +506,6 @@ describe('LootCreator contract tests', () => {
             const prev_period = await creator.nextBudgetUpdatePeriod()
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -512,8 +514,6 @@ describe('LootCreator contract tests', () => {
             const new_pending_budget = await creator.pengingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -535,7 +535,6 @@ describe('LootCreator contract tests', () => {
             period = prev_period.sub(WEEK)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -548,8 +547,6 @@ describe('LootCreator contract tests', () => {
             const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -571,7 +568,6 @@ describe('LootCreator contract tests', () => {
             period = prev_period.sub(WEEK)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -584,8 +580,6 @@ describe('LootCreator contract tests', () => {
             const new_period_budget = await creator.periodBudget(prev_period)
             expect(new_period_budget.palAmount).to.be.eq(pal_amount)
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount)
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -652,7 +646,6 @@ describe('LootCreator contract tests', () => {
             expect(past_period_allocated.extraAmount).not.to.be.eq(0)
 
             const tx = await creator.connect(admin).updatePeriod()
-            const tx_block = (await tx).blockNumber
 
             const new_period = await creator.nextBudgetUpdatePeriod()
 
@@ -669,8 +662,6 @@ describe('LootCreator contract tests', () => {
             expect(new_period_budget.extraAmount).to.be.eq(extra_amount.add(
                 past_period_budget.extraAmount.sub(past_period_allocated.extraAmount)
             ))
-            
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -736,7 +727,6 @@ describe('LootCreator contract tests', () => {
             const tx_block = (await tx).blockNumber
 
             expect(await creator.nextBudgetUpdatePeriod()).to.be.eq(prev_period.add(WEEK))
-            expect(await creator.periodBlockCheckpoint(prev_period)).to.be.eq(tx_block)
 
         });
 
@@ -814,6 +804,8 @@ describe('LootCreator contract tests', () => {
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(period)
 
+            const prev_pending_budget = await creator.pengingBudget()
+
             await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
                 creator.address,
                 quest_id,
@@ -825,8 +817,14 @@ describe('LootCreator contract tests', () => {
 
             const UNIT = ethers.utils.parseEther("1")
 
+            const over_cap_pal_amount = period_budget.palAmount.mul(bigger_gauge_weight).div(UNIT)
+            const over_cap_extra_amount = period_budget.extraAmount.mul(bigger_gauge_weight).div(UNIT)
+
             const gauge_pal_amount = period_budget.palAmount.mul(gauge_cap).div(UNIT)
             const gauge_extra_amount = period_budget.extraAmount.mul(gauge_cap).div(UNIT)
+
+            const unused_pal_amount = over_cap_pal_amount.sub(gauge_pal_amount)
+            const unused_extra_amount = over_cap_extra_amount.sub(gauge_extra_amount)
 
             const gauge_budget = await creator.gaugeBudgetPerPeriod(questGauge1.address, period)
 
@@ -835,8 +833,13 @@ describe('LootCreator contract tests', () => {
 
             const new_period_allocated = await creator.allocatedBudgetHistory(period)
 
-            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(gauge_pal_amount))
-            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount))
+            expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(over_cap_pal_amount))
+            expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(over_cap_extra_amount))
+
+            const new_pending_budget = await creator.pengingBudget()
+
+            expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(unused_pal_amount))
+            expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(unused_extra_amount))
             
             expect(await creator.isGaugeAllocatedForPeriod(questGauge1.address, period)).to.be.true
             expect(await creator.totalQuestPeriodSet(distributor.address, quest_id, period)).to.be.true
@@ -1084,6 +1087,34 @@ describe('LootCreator contract tests', () => {
 
         });
 
+        it(' should notify multiple claims of same user correctly (in case of fixed period)', async () => {
+
+            const extra_claim_amount = ethers.utils.parseEther("125")
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(0)
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user1.address,
+                quest_id,
+                period,
+                claim_amount
+            )
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(claim_amount)
+
+            await distributor.connect(admin).sendNotifyQuestClaim(
+                creator.address,
+                user1.address,
+                quest_id,
+                period,
+                extra_claim_amount
+            )
+
+            expect(await creator.userQuestPeriodRewards(distributor.address, quest_id, period, user1.address)).to.be.eq(claim_amount.add(extra_claim_amount))
+
+        });
+
         it(' should only be allowed for listed distributor', async () => {
 
             await expect(
@@ -1132,6 +1163,8 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).addDistributor(distributor.address)
 
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
+
             await advanceTime(WEEK.toNumber())
 
             period = await creator.nextBudgetUpdatePeriod()
@@ -1169,8 +1202,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
@@ -1577,6 +1610,8 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).addDistributor(distributor.address)
 
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
+
             await advanceTime(WEEK.toNumber())
 
             period = await creator.nextBudgetUpdatePeriod()
@@ -1616,8 +1651,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
@@ -1649,8 +1684,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards2
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period2),
+            await power.connect(admin).setTotalLockedAtTs(
+                period2,
                 total_hPal_power2
             )
 
@@ -1682,8 +1717,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards3
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period3),
+            await power.connect(admin).setTotalLockedAtTs(
+                period3,
                 total_hPal_power3
             )
 
@@ -1863,6 +1898,8 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).addDistributor(distributor.address)
 
+            await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
+
             await advanceTime(WEEK.toNumber())
 
             period = await creator.nextBudgetUpdatePeriod()
@@ -1900,8 +1937,8 @@ describe('LootCreator contract tests', () => {
                 total_rewards
             )
 
-            await power.connect(admin).setTotalLockedAt(
-                await creator.periodBlockCheckpoint(period),
+            await power.connect(admin).setTotalLockedAtTs(
+                period,
                 total_hPal_power
             )
 
@@ -1942,6 +1979,93 @@ describe('LootCreator contract tests', () => {
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(expected_slash_amount))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
+
+        });
+
+    });
+
+    describe('notifyAddedRewardsQuestPeriod', async () => {
+
+        let period: BigNumber
+
+        const quest_id = 1
+
+        const total_rewards = ethers.utils.parseEther("2500")
+        const added_rewards = ethers.utils.parseEther("475")
+
+        const gauge_weight = ethers.utils.parseEther("0.15")
+
+        beforeEach(async () => {
+
+            await creator.connect(admin).init(gauge.address)
+
+            await creator.connect(admin).addDistributor(distributor.address)
+
+            await advanceTime(WEEK.toNumber())
+
+            period = await creator.nextBudgetUpdatePeriod()
+
+            await board.connect(admin).addQuest(quest_id, questGauge1.address)
+
+            const pal_amount = ethers.utils.parseEther("2150")
+            const extra_amount = ethers.utils.parseEther("0.005")
+
+            await pal.connect(admin).transfer(gauge.address, pal_amount)
+            await extraToken.connect(admin).transfer(gauge.address, extra_amount)
+
+            await gauge.connect(admin).addBudget(pal_amount, extra_amount)
+
+            await creator.connect(admin).updatePeriod()
+
+            await advanceTime(WEEK.toNumber())
+
+            const prev_period = await creator.nextBudgetUpdatePeriod()
+            period = prev_period
+
+            await controller.connect(admin).setGaugeWeightAt(questGauge1.address, period, gauge_weight)
+
+            await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
+                creator.address,
+                quest_id,
+                period,
+                total_rewards
+            )
+
+        });
+
+        it(' should update the storage corectly', async () => {
+
+            const prev_total_quest_period = await creator.totalQuestPeriodRewards(distributor.address, quest_id, period)
+
+            await distributor.connect(admin).sendNotifyAddedRewardsQuestPeriod(creator.address, quest_id, period, added_rewards)
+
+            const new_total_quest_period = await creator.totalQuestPeriodRewards(distributor.address, quest_id, period)
+
+            expect(new_total_quest_period).to.be.eq(prev_total_quest_period.add(added_rewards))
+
+        });
+
+        it(' should not update if given 0', async () => {
+
+            const prev_total_quest_period = await creator.totalQuestPeriodRewards(distributor.address, quest_id, period)
+
+            await distributor.connect(admin).sendNotifyAddedRewardsQuestPeriod(creator.address, quest_id, period, 0)
+
+            const new_total_quest_period = await creator.totalQuestPeriodRewards(distributor.address, quest_id, period)
+
+            expect(new_total_quest_period).to.be.eq(prev_total_quest_period)
+
+        });
+
+        it(' should fail if caller is not allowed', async () => {
+
+            await expect(
+                creator.connect(user1).notifyAddedRewardsQuestPeriod(quest_id, period, added_rewards)
+            ).to.be.revertedWith("CallerNotAllowed")
+
+            await expect(
+                creator.connect(admin).notifyAddedRewardsQuestPeriod(quest_id, period, added_rewards)
+            ).to.be.revertedWith("CallerNotAllowed")
 
         });
 

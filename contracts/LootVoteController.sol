@@ -11,7 +11,6 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ILootVoteController} from "./interfaces/ILootVoteController.sol";
 import {IHolyPalPower} from "./interfaces/IHolyPalPower.sol";
 import "./libraries/Errors.sol";
@@ -23,7 +22,7 @@ import "./utils/Owner.sol";
     Contract handling the vote logic for repartition of the global Loot budget
     between all the listed gauges for the Quest system
 */
-contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
+contract LootVoteController is Owner, ILootVoteController {
     using SafeERC20 for IERC20;
 
     // Constants
@@ -39,6 +38,15 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     /** @notice Cooldown between 2 votes */
     uint256 private constant VOTE_COOLDOWN = 864000; // 10 days
+
+    /** @notice Max number of votes an user can vote at once */
+    uint256 private constant MAX_VOTE_LENGTH = 10;
+
+    /** @notice Max number of proxies an user can have at once */
+    uint256 private constant MAX_PROXY_LENGTH = 50;
+
+    uint256 private constant MIN_GAUGE_CAP = 0.001 * 1e18; // 0.1%
+    uint256 private constant MAX_GAUGE_CAP = 1 * 1e18; // 100%
 
 
     // Structs
@@ -90,7 +98,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     // Storage
 
     /** @notice Address of the hPalPower contract */
-    address public hPalPower;
+    address public immutable hPalPower;
 
     /** @notice Next ID to list Boards */
     uint256 public nextBoardId; // ID 0 == no ID/not set
@@ -140,8 +148,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     uint256 public timeTotal;
 
     /** @notice Proxy Managers set for each user */
-    // user -> proxy voter -> bool
+    // user -> proxy manager -> bool
     mapping(address => mapping(address => bool)) public isProxyManager;
+
+    /** @notice Max Proxy duration allowed for Manager */
+    // user -> proxy manager -> uint256
+    mapping(address => mapping(address => uint256)) public maxProxyDuration;
 
     /** @notice State of Proxy Managers for each user */
     // user -> proxy voter -> state
@@ -183,16 +195,23 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
     /** @notice Event emitted when a Proxy Manager is set */
     event SetProxyManager(address indexed user, address indexed manager);
+    /** @notice Event emitted when a Proxy Manager is removed */
+    event RemoveProxyManager(address indexed user, address indexed manager);
     /** @notice Event emitted when a Proxy Voter is set */
     event SetNewProxyVoter(address indexed user, address indexed proxyVoter, uint256 maxPower, uint256 endTimestamp);
+    
+    /** @notice Event emitted when the default gauge cap is updated */
+    event DefaultCapUpdated(uint256 newCap);
 
 
     // Constructor
 
     constructor(address _hPalPower) {
+        if(_hPalPower == address(0)) revert Errors.AddressZero();
+
         hPalPower = _hPalPower;
 
-        nextBoardId++;
+        nextBoardId = 1;
 
         timeTotal = (block.timestamp) / WEEK * WEEK;
     }
@@ -301,7 +320,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauge
     * @param userPower Power used for this gauge
     */
-    function voteForGaugeWeights(address gauge, uint256 userPower) external nonReentrant {
+    function voteForGaugeWeights(address gauge, uint256 userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(msg.sender);
+
         _voteForGauge(msg.sender, gauge, userPower, msg.sender);
     }
 
@@ -311,8 +333,12 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeights(address[] memory gauge, uint256[] memory userPower) external nonReentrant {
+    function voteForManyGaugeWeights(address[] calldata gauge, uint256[] calldata userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(msg.sender);
+
         uint256 length = gauge.length;
+        if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
         for(uint256 i; i < length; i++) {
             _voteForGauge(msg.sender, gauge[i], userPower[i], msg.sender);
@@ -326,7 +352,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauge
     * @param userPower Power used for this gauge
     */
-    function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external nonReentrant {
+    function voteForGaugeWeightsFor(address user, address gauge, uint256 userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(user);
+
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
@@ -342,17 +371,22 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param gauge Address of the gauges
     * @param userPower Power used for each gauge
     */
-    function voteForManyGaugeWeightsFor(address user, address[] memory gauge, uint256[] memory userPower) external nonReentrant {
+    function voteForManyGaugeWeightsFor(address user, address[] calldata gauge, uint256[] calldata userPower) external {
+        // Clear any expired past Proxy
+        _clearExpiredProxies(user);
+
         ProxyVoter memory proxyState = proxyVoterState[user][msg.sender];
         if(proxyState.maxPower == 0) revert Errors.NotAllowedProxyVoter();
         if(proxyState.endTimestamp < block.timestamp) revert Errors.ExpiredProxy();
         uint256 totalPower;
 
         uint256 length = gauge.length;
+        if(length > MAX_VOTE_LENGTH) revert Errors.MaxVoteListExceeded();
         if(length != userPower.length) revert Errors.ArraySizeMismatch();
-        for(uint256 i; i < length; i++) {
+        for(uint256 i; i < length;) {
             totalPower += userPower[i];
             _voteForGauge(user, gauge[i], userPower[i], msg.sender);
+            unchecked { i++; }
         }
         if(totalPower > proxyState.maxPower) revert Errors.VotingPowerProxyExceeded();
     }
@@ -403,13 +437,41 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @notice Approves a Proxy Manager for the caller
     * @dev Approves a Proxy Manager for the caller allowed to create Proxy on his voting power
     * @param manager Address of the Proxy Manager
+    * @param maxDuration Maximum Proxy duration allowed to be created by the Manager (can be set to 0 for no limit)
     */
-    function approveProxyManager(address manager) external {
+    function approveProxyManager(address manager, uint256 maxDuration) external {
         if(manager == address(0)) revert Errors.AddressZero();
 
         isProxyManager[msg.sender][manager] = true;
+        maxProxyDuration[msg.sender][manager] = maxDuration;
 
         emit SetProxyManager(msg.sender, manager);
+    }
+
+    /**
+    * @notice Updates the max duration allowed for a Proxy Manager
+    * @dev  Updates the max duration allowed for a Proxy Manager
+    * @param manager Address of the Proxy Manager
+    * @param newMaxDuration Maximum Proxy duration allowed to be created by the Manager (can be set to 0 for no limit)
+    */
+    function updateProxyManagerDuration(address manager, uint256 newMaxDuration) external {
+        if(manager == address(0)) revert Errors.AddressZero();
+        if(!isProxyManager[msg.sender][manager]) revert Errors.NotAllowedManager();
+
+        maxProxyDuration[msg.sender][manager] = newMaxDuration;
+    }
+
+    /**
+    * @notice Approves a Proxy Manager for the caller
+    * @dev Approves a Proxy Manager for the caller allowed to create Proxy on his voting power
+    * @param manager Address of the Proxy Manager
+    */
+    function removeProxyManager(address manager) external {
+        if(manager == address(0)) revert Errors.AddressZero();
+
+        isProxyManager[msg.sender][manager] = false;
+
+        emit RemoveProxyManager(msg.sender, manager);
     }
 
     /**
@@ -420,14 +482,18 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param maxPower Max voting power allowed for the Proxy
     * @param endTimestamp Timestamp of the Proxy expiry
     */
-    function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external nonReentrant {
+    function setVoterProxy(address user, address proxy, uint256 maxPower, uint256 endTimestamp) external {
         if(!isProxyManager[user][msg.sender] && msg.sender != user) revert Errors.NotAllowedManager();
         if(maxPower == 0 || maxPower > MAX_BPS) revert Errors.VotingPowerInvalid();
+        if(currentUserProxyVoters[user].length + 1 > MAX_PROXY_LENGTH) revert Errors.MaxProxyListExceeded();
 
         // Round down the end timestamp to weeks & check the user Lock is not expired then
         endTimestamp = endTimestamp / WEEK * WEEK;
         uint256 userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
         if(endTimestamp < block.timestamp || endTimestamp > userLockEnd) revert Errors.InvalidTimestamp();
+
+        uint256 maxDuration = maxProxyDuration[user][msg.sender];
+        if(maxDuration > 0 && endTimestamp > block.timestamp + maxDuration) revert Errors.ProxyDurationExceeded();
 
         // Clear any expired past Proxy
         _clearExpiredProxies(user);
@@ -480,12 +546,10 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     * @param user Address of the user
     */
     function _clearExpiredProxies(address user) internal {
-        address[] memory proxies = currentUserProxyVoters[user];
-        uint256 length = proxies.length;
+        uint256 length = currentUserProxyVoters[user].length;
         if(length == 0) return;
-        uint256 lastIndex = length - 1;
-        for(uint256 i; i < length; i++) {
-            address proxyVoter = proxies[i];
+        for(uint256 i; i < length;) {
+            address proxyVoter = currentUserProxyVoters[user][i];
             if(proxyVoterState[user][proxyVoter].endTimestamp < block.timestamp) {
                 // Free the user blocked voting power
                 blockedProxyPower[user] -= proxyVoterState[user][proxyVoter].maxPower;
@@ -493,10 +557,14 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
                 delete proxyVoterState[user][proxyVoter];
                 
                 // Remove the Proxy from the user's list
+                uint256 lastIndex = length - 1;
                 if(i != lastIndex) {
                     currentUserProxyVoters[user][i] = currentUserProxyVoters[user][length-1];
                 }
                 currentUserProxyVoters[user].pop();
+                length--;
+            } else {
+                unchecked{ i++; }
             }
         }
     }
@@ -519,19 +587,19 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
 
         // Check the gauge is listed & the user lock is not expired
         if(!_isGaugeListed(gauge)) revert Errors.NotListed();
-        if(vars.userLockEnd < vars.nextPeriod) revert Errors.LockExpired();
+        if(vars.userLockEnd <= vars.nextPeriod) revert Errors.LockExpired();
         // Check the user has enough voting power & the cooldown is respected
         if(userPower > MAX_BPS) revert Errors.VotingPowerInvalid();
         if(block.timestamp < lastUserVote[user][gauge] + VOTE_COOLDOWN) revert Errors.VotingCooldown();
-
-        // Clear any expired past Proxy
-        _clearExpiredProxies(user);
 
         // Load the user past vote state
         VotedSlope memory oldSlope = voteUserSlopes[user][gauge];
         if(oldSlope.end > vars.nextPeriod) {
             vars.oldBias = oldSlope.slope * (oldSlope.end - vars.nextPeriod);
         }
+
+        // No vote to cast & no previous vote to remove == useless action
+        if(userPower == 0 && oldSlope.power == 0) return;
 
         // Calculate the new vote state
         VotedSlope memory newSlope = VotedSlope({
@@ -634,7 +702,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeight[gauge][ts];
-        for(uint256 i; i < 100; i++) {
+        for(uint256 i; i < 500; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
@@ -668,7 +736,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(ts == 0) return 0;
 
         Point memory _point = pointsWeightTotal[ts];
-        for(uint256 i; i < 100; i++) {
+        for(uint256 i; i < 500; i++) {
             if(ts > block.timestamp) break;
             ts += WEEK;
 
@@ -723,6 +791,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
     */
     function updateDistributor(address board, address newDistributor) external onlyOwner {
         if(board == address(0) || newDistributor == address(0)) revert Errors.AddressZero();
+        if(distributorToId[newDistributor] != 0) revert Errors.AlreadyListed();
         
         uint256 boardId = boardToId[board];
         if(boardId == 0) revert Errors.InvalidParameter();
@@ -744,6 +813,7 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(gauge == address(0)) revert Errors.AddressZero();
         if(boardId == 0) revert Errors.InvalidParameter();
         if(_isGaugeListed(gauge)) revert Errors.AlreadyListed();
+        if((cap < MIN_GAUGE_CAP && cap != 0) || cap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
 
         gaugeToBoardId[gauge] = boardId;
         gaugeCaps[gauge] = cap;
@@ -763,11 +833,25 @@ contract LootVoteController is Owner, ReentrancyGuard, ILootVoteController {
         if(gauge == address(0)) revert Errors.AddressZero();
         if(gaugeToBoardId[gauge] == 0) revert Errors.InvalidParameter();
         if(isGaugeKilled[gauge]) revert Errors.KilledGauge();
+        if((newCap < MIN_GAUGE_CAP && newCap != 0) || newCap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
 
         gaugeCaps[gauge] = newCap;
 
         emit GaugeCapUpdated(gauge, gaugeToBoardId[gauge], newCap);
     }
+
+    /**
+    * @notice Updates the default weight cap
+    * @dev Updates the default weight cap
+    * @param newCap New default weight cap
+    */
+    function updateDefaultGaugeCap(uint256 newCap) external onlyOwner {
+        if(newCap < MIN_GAUGE_CAP || newCap > MAX_GAUGE_CAP) revert Errors.InvalidGaugeCap();
+        defaultCap = newCap;
+
+        emit DefaultCapUpdated(newCap);
+    }
+
 
     /**
     * @notice Kills a gauge

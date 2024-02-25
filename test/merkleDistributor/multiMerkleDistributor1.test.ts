@@ -8,7 +8,6 @@ import { IERC20__factory } from "../../typechain/factories/@openzeppelin/contrac
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber } from "@ethersproject/bignumber";
-import { parseBalanceMap } from "../utils/merkle/parse-balance-map";
 import BalanceTree from "../utils/merkle/balance-tree";
 
 import {
@@ -1497,6 +1496,25 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
             await expect(
                 distributor.connect(mockQuestBoard).fixQuestPeriod(quest_id1, period.add(WEEK), new_totalRewards)
             ).to.be.revertedWith('PeriodNotListed')
+
+        });
+
+        it(' should fail if period is already distributed', async () => {
+
+            tree = new BalanceTree([
+                { account: user1.address, amount: user1_claim_amount, questID: quest_id1, period: period },
+                { account: user2.address, amount: user2_claim_amount, questID: quest_id1, period: period },
+                { account: user3.address, amount: user3_claim_amount, questID: quest_id1, period: period },
+                { account: user4.address, amount: user4_claim_amount, questID: quest_id1, period: period },
+            ]);
+
+            tree_root = tree.getHexRoot()
+
+            await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id1, period, distrib_amount, tree_root)
+
+            await expect(
+                distributor.connect(mockQuestBoard).fixQuestPeriod(quest_id1, period, new_totalRewards)
+            ).to.be.revertedWith('PeriodAlreadyUpdated')
 
         });
 

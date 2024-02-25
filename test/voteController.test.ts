@@ -299,6 +299,17 @@ describe('LootVoteController contract tests', () => {
 
         });
 
+        it(' should fail if the Distributor is already listed with another Board', async () => {
+
+            await expect(
+                controller.connect(admin).updateDistributor(
+                    board3.address,
+                    distributor2.address,
+                )
+            ).to.be.revertedWith('AlreadyListed')
+
+        });
+
         it(' should fail if given invalid parameters', async () => {
 
             await expect(
@@ -337,6 +348,64 @@ describe('LootVoteController contract tests', () => {
                 controller.connect(gauge1).updateDistributor(
                     board1.address,
                     newDistributor.address,
+                )
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
+
+        });
+    
+    });
+    
+    describe('updateDefaultGaugeCap', async () => {
+
+        const new_default_cap = ethers.utils.parseEther("0.2")
+
+        it(' should update the default gauge cap correctly', async () => {
+
+            expect(await controller.defaultCap()).to.be.eq(DEFAULT_CAP)
+
+            const tx = await controller.connect(admin).updateDefaultGaugeCap(
+                new_default_cap
+            )
+            
+            expect(await controller.defaultCap()).to.be.eq(new_default_cap)
+
+            expect(tx).to.emit(controller, "DefaultCapUpdated").withArgs(new_default_cap)
+            
+        });
+
+        it(' should fail if the new given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateDefaultGaugeCap(
+                    0
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+        });
+
+        it(' should only be allowed for admin', async () => {
+
+            await expect(
+                controller.connect(user1).updateDefaultGaugeCap(
+                    new_default_cap
+                )
+            ).to.be.revertedWith('OwnableUnauthorizedAccount("' + user1.address + '")')
+
+            await expect(
+                controller.connect(gauge1).updateDefaultGaugeCap(
+                    new_default_cap
                 )
             ).to.be.revertedWith('OwnableUnauthorizedAccount("' + gauge1.address + '")')
 
@@ -645,6 +714,26 @@ describe('LootVoteController contract tests', () => {
 
         });
 
+        it(' should fail if the given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).addNewGauge(
+                    gauge1.address,
+                    board1_id,
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).addNewGauge(
+                    gauge1.address,
+                    board1_id,
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+        });
+
         it(' should only be allowed for admin', async () => {
 
             await expect(
@@ -773,6 +862,24 @@ describe('LootVoteController contract tests', () => {
                     new_gauge1_cap
                 )
             ).to.be.revertedWith('AddressZero')
+
+        });
+
+        it(' should fail if the given cap is invalid', async () => {
+
+            await expect(
+                controller.connect(admin).updateGaugeCap(
+                    gauge1.address,
+                    ethers.utils.parseEther("0.0000001")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
+
+            await expect(
+                controller.connect(admin).updateGaugeCap(
+                    gauge1.address,
+                    ethers.utils.parseEther("3")
+                )
+            ).to.be.revertedWith('InvalidGaugeCap')
 
         });
 
@@ -1899,6 +2006,27 @@ describe('LootVoteController contract tests', () => {
                     [vote_power, vote_power2]
                 )
             ).to.be.revertedWith('ArraySizeMismatch')
+
+        });
+
+        it(' should fail if the given list exceeds the max length', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const gauges = [gauge1.address, gauge2.address, gauge3.address]
+            const powers = [vote_power, vote_power2, vote_power3]
+            
+            const gauge_list = gauges.concat(gauges).concat(gauges).concat(gauges)
+            const power_list = powers.concat(powers).concat(powers).concat(powers)
+
+            await expect(
+                controller.connect(user1).voteForManyGaugeWeights(
+                    gauge_list,
+                    power_list
+                )
+            ).to.be.revertedWith('MaxVoteListExceeded')
 
         });
 
@@ -3040,9 +3168,27 @@ describe('LootVoteController contract tests', () => {
 
             expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
 
-            const tx = await controller.connect(user1).approveProxyManager(manager.address)
+            const tx = await controller.connect(user1).approveProxyManager(manager.address, 0)
 
             expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(0)
+
+            await expect(tx).to.emit(controller, 'SetProxyManager').withArgs(user1.address, manager.address)
+
+        });
+
+        it(' should set the correct maxDuration if given', async () => {
+
+            const maxDuration = WEEK.mul(4)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
+
+            const tx = await controller.connect(user1).approveProxyManager(manager.address, maxDuration)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(maxDuration)
 
             await expect(tx).to.emit(controller, 'SetProxyManager').withArgs(user1.address, manager.address)
 
@@ -3051,7 +3197,75 @@ describe('LootVoteController contract tests', () => {
         it(' should fail if given address 0x0', async () => {
 
             await expect(
-                controller.connect(user1).approveProxyManager(ethers.constants.AddressZero)
+                controller.connect(user1).approveProxyManager(ethers.constants.AddressZero, 0)
+            ).to.be.revertedWith('AddressZero')
+
+        });
+    
+    });
+
+    describe('updateProxyManagerDuration', async () => {
+
+        const newMaxDuration = WEEK.mul(4)
+
+        beforeEach(async () => {
+
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
+
+        });
+
+        it(' should update the max duration correctly', async () => {
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(0)
+
+            await controller.connect(user1).updateProxyManagerDuration(manager.address, newMaxDuration)
+
+            expect(await controller.maxProxyDuration(user1.address, manager.address)).to.be.eq(newMaxDuration)
+
+        });
+
+        it(' should fail if maanger is not allowed', async () => {
+
+            await expect(
+                controller.connect(user1).updateProxyManagerDuration(user1.address, newMaxDuration)
+            ).to.be.revertedWith('NotAllowedManager')
+
+        });
+
+        it(' should fail if given address 0x0', async () => {
+
+            await expect(
+                controller.connect(user1).updateProxyManagerDuration(ethers.constants.AddressZero, newMaxDuration)
+            ).to.be.revertedWith('AddressZero')
+
+        });
+    
+    });
+
+    describe('removeProxyManager', async () => {
+
+        beforeEach(async () => {
+
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
+
+        });
+
+        it(' should remove the proxy manager correctly', async () => {
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.true
+
+            const tx = await controller.connect(user1).removeProxyManager(manager.address)
+
+            expect(await controller.isProxyManager(user1.address, manager.address)).to.be.false
+
+            await expect(tx).to.emit(controller, 'RemoveProxyManager').withArgs(user1.address, manager.address)
+
+        });
+
+        it(' should fail if given address 0x0', async () => {
+
+            await expect(
+                controller.connect(user1).removeProxyManager(ethers.constants.AddressZero)
             ).to.be.revertedWith('AddressZero')
 
         });
@@ -3159,7 +3373,7 @@ describe('LootVoteController contract tests', () => {
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
             await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -3333,6 +3547,20 @@ describe('LootVoteController contract tests', () => {
             ).to.be.revertedWith('NotAllowedManager')
         });
 
+        it(' should fail if endTimestamp exceeds the allowed max duration for manager', async () => {
+
+            const maxDuration = WEEK.mul(4)
+
+            await controller.connect(user1).updateProxyManagerDuration(manager.address, maxDuration)
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await expect(
+                controller.connect(manager).setVoterProxy(user1.address, proxyVoter1.address, 4000, current_ts.add(proxy_duration.add(WEEK)))
+            ).to.be.revertedWith('ProxyDurationExceeded')
+        });
+
         it(' should fail if given an invalid vote power', async () => {
 
             let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
@@ -3481,7 +3709,7 @@ describe('LootVoteController contract tests', () => {
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
             await power.connect(admin).setLockedEnd(user2.address, current_ts.add(WEEK.mul(96)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
             await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
             await controller.connect(user1).setVoterProxy(user1.address, proxyVoter2.address, proxy_power2, current_ts.add(proxy_duration2))
@@ -3657,7 +3885,7 @@ describe('LootVoteController contract tests', () => {
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -3772,7 +4000,7 @@ describe('LootVoteController contract tests', () => {
             
             await expect(
                 controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge2.address, 4000)
-            ).to.be.revertedWith('ExpiredProxy')
+            ).to.be.revertedWith('NotAllowedProxyVoter')
 
         });
 
@@ -4061,7 +4289,7 @@ describe('LootVoteController contract tests', () => {
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
 
-            await controller.connect(user1).approveProxyManager(manager.address)
+            await controller.connect(user1).approveProxyManager(manager.address, 0)
 
         });
 
@@ -4570,7 +4798,7 @@ describe('LootVoteController contract tests', () => {
             
             await expect(
                 controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address, gauge2.address], [2000, 2500])
-            ).to.be.revertedWith('ExpiredProxy')
+            ).to.be.revertedWith('NotAllowedProxyVoter')
 
         });
 
@@ -4588,6 +4816,33 @@ describe('LootVoteController contract tests', () => {
             await expect(
                 controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(user1.address, [gauge1.address], [2000, 2500])
             ).to.be.revertedWith('ArraySizeMismatch')
+
+        });
+
+        it(' should fail if the given list exceeds the max length', async () => {
+
+            const vote_power = 4000
+            const vote_power2 = 2500
+            const vote_power3 = 3500
+
+            const gauges = [gauge1.address, gauge2.address, gauge3.address]
+            const powers = [vote_power, vote_power2, vote_power3]
+            
+            const gauge_list = gauges.concat(gauges).concat(gauges).concat(gauges)
+            const power_list = powers.concat(powers).concat(powers).concat(powers)
+
+            let current_ts = BigNumber.from((await provider.getBlock('latest')).timestamp)
+            current_ts = current_ts.div(WEEK).mul(WEEK)
+
+            await controller.connect(user1).setVoterProxy(user1.address, proxyVoter1.address, proxy_power, current_ts.add(proxy_duration))
+
+            await expect(
+                controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
+                    user1.address,
+                    gauge_list,
+                    power_list
+                )
+            ).to.be.revertedWith('MaxVoteListExceeded')
 
         });
     

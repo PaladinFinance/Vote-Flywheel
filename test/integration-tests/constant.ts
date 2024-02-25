@@ -47,9 +47,9 @@ export const PAL_ADDRESS = "0xAB846Fb6C81370327e784Ae7CbB6d6a6af6Ff4BF"
 export const PAL_HOLDER = "0x830B63eA52CCcf241A329F3932B4cfCf17287ed7"
 export const PAL_AMOUNT = ethers.utils.parseEther("500000")
 
-export const REWARD_TOKEN = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-export const REWARD_HOLDER = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8"
-export const REWARD_AMOUNT = ethers.utils.parseEther('10000000');
+export const REWARD_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+export const REWARD_HOLDER = "0x8EB8a3b98659Cce290402893d0123abb75E3ab28"
+export const REWARD_AMOUNT = ethers.utils.parseEther('25000');
 
 export const BLOCK_NUMBER = 18735000
 

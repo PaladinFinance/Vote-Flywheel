@@ -51,11 +51,12 @@ describe('LootGauge contract tests', () => {
     let pal: IERC20
     let extraToken: IERC20
 
+    let new_creator: SignerWithAddress
 
     before(async () => {
         await resetFork();
 
-        [admin, lootReserve, loot, otherUser] = await ethers.getSigners();
+        [admin, lootReserve, loot, otherUser, new_creator] = await ethers.getSigners();
 
         gaugeFactory = await ethers.getContractFactory("LootGauge");
         controllerFactory = await ethers.getContractFactory("MockBudgetController");
@@ -281,6 +282,44 @@ describe('LootGauge contract tests', () => {
 
             await expect(
                 gauge.connect(lootReserve).sendLootBudget(pal_budget, extra_budget)
+            ).to.be.reverted
+
+        });
+
+    });
+    
+    describe('updateLootCreator', async () => {
+
+        it(' should update the parameter correctly', async () => {
+
+            const tx = await gauge.connect(admin).updateLootCreator(new_creator.address)
+
+            expect(await gauge.lootCreator()).to.be.eq(new_creator.address)
+            
+            expect(tx).to.emit(gauge, 'LootCreatorUpdated').withArgs(lootCreator.address, new_creator.address)
+
+        });
+
+        it(' should fail if given incorrect parameters', async () => {
+
+            await expect(
+                gauge.connect(admin).updateLootCreator(ethers.constants.AddressZero)
+            ).to.be.revertedWith("InvalidParameter")
+
+            await expect(
+                gauge.connect(admin).updateLootCreator(lootCreator.address)
+            ).to.be.revertedWith("SameAddress")
+
+        });
+
+        it(' should only be allowed for owner', async () => {
+
+            await expect(
+                gauge.connect(otherUser).updateLootCreator(new_creator.address)
+            ).to.be.reverted
+            
+            await expect(
+                gauge.connect(new_creator).updateLootCreator(new_creator.address)
             ).to.be.reverted
 
         });

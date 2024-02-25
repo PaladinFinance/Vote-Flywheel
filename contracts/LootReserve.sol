@@ -51,6 +51,8 @@ contract LootReserve is Owner {
         address _pal,
         address _extraToken
     ){
+        if(_pal == address(0) || _extraToken == address(0)) revert Errors.AddressZero();
+
         pal = IERC20(_pal);
         extraToken = IERC20(_extraToken);
     }
@@ -106,8 +108,11 @@ contract LootReserve is Owner {
     * @dev Resets the allowances for the Loot contract to max uint256
     */
     function resetMaxAllowance() external onlyOwner {
-        pal.approve(loot, type(uint256).max);
-        extraToken.approve(loot, type(uint256).max);
+        uint256 palAllowance = pal.allowance(address(this), loot);
+        uint256 extraAllowance = extraToken.allowance(address(this), loot);
+
+        pal.safeIncreaseAllowance(loot, type(uint256).max - palAllowance);
+        extraToken.safeIncreaseAllowance(loot, type(uint256).max - extraAllowance);
 
         emit MaxAllowanceSet(address(pal), loot);
         emit MaxAllowanceSet(address(extraToken), loot);

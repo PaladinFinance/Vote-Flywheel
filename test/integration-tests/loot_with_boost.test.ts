@@ -65,7 +65,7 @@ let lootFactory: ContractFactory
 let reserveFactory: ContractFactory
 let distributorFactory: ContractFactory
 
-describe('Vote Controller - Voting tests - with delegated boost', () => {
+describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
     let admin: SignerWithAddress
     let boardAdmin: SignerWithAddress
 
@@ -232,7 +232,9 @@ describe('Vote Controller - Voting tests - with delegated boost', () => {
             creator.address,
             reserve.address,
             0,
-            0
+            0,
+            ethers.utils.parseEther("10000"),
+            ethers.utils.parseEther("10")
         )) as LootBudget
         await budget.deployed()
 
@@ -256,7 +258,7 @@ describe('Vote Controller - Voting tests - with delegated boost', () => {
         let board2_id: BigNumber
 
         const pal_budget = ethers.utils.parseEther("4500")
-        const extra_budget = ethers.utils.parseEther("12500")
+        const extra_budget = ethers.utils.parseEther("7.5")
 
         const vote_powers1 = [BigNumber.from(4000), BigNumber.from(2500), BigNumber.from(3500)]
         const vote_powers2 = [BigNumber.from(5000), BigNumber.from(1500), BigNumber.from(2500), BigNumber.from(1000)]
@@ -464,8 +466,8 @@ describe('Vote Controller - Voting tests - with delegated boost', () => {
             const prev_user_loot_count = (await loot.getAllUserLoot(user3.address)).length
 
             const user_pal_power = await proxy.adjusted_balance_of_at(user3.address, closed_period)
-            const total_pal_power = await proxy.total_locked_at(
-                await creator.periodBlockCheckpoint(closed_period)
+            const total_pal_power = await proxy.find_total_locked_at(
+                closed_period
             )
 
             const expcted_user_ratio = user_pal_power.mul(UNIT).div(total_pal_power).mul(UNIT).div(

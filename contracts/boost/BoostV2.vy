@@ -47,8 +47,6 @@ PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spe
 
 WEEK: constant(uint256) = 86400 * 7
 
-
-DOMAIN_SEPARATOR: immutable(bytes32)
 HOLY_PAL_POWER: immutable(address)
 
 
@@ -68,10 +66,16 @@ received_checkpoints_nonces: public(HashMap[address, uint256])
 
 @external
 def __init__(_ve: address):
-    DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self))
+    assert _ve != ZERO_ADDRESS
+
     HOLY_PAL_POWER = _ve
 
     log Transfer(ZERO_ADDRESS, msg.sender, 0)
+
+@internal
+@view
+def _domain_separator() -> bytes32:
+    return keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self))
 
 @internal
 @pure
@@ -367,7 +371,7 @@ def permit(_owner: address, _spender: address, _value: uint256, _deadline: uint2
     digest: bytes32 = keccak256(
         concat(
             b"\x19\x01",
-            DOMAIN_SEPARATOR,
+            self._domain_separator(),
             keccak256(_abi_encode(PERMIT_TYPEHASH, _owner, _spender, _value, nonce, _deadline))
         )
     )
@@ -556,10 +560,10 @@ def decimals() -> uint8:
     return 18
 
 
-@pure
+@view
 @external
 def DOMAIN_SEPARATOR() -> bytes32:
-    return DOMAIN_SEPARATOR
+    return self._domain_separator()
 
 
 @pure

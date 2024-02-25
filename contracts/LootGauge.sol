@@ -35,7 +35,7 @@ contract LootGauge is Owner, ReentrancyGuard {
     address immutable public extraToken;
     
     /** @notice Address of the Loot Creator contract */
-    address immutable public lootCreator;
+    address public lootCreator;
     /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
 
@@ -47,6 +47,8 @@ contract LootGauge is Owner, ReentrancyGuard {
 
     /** @notice Event emitted when the Budget Controller address is set */
     event BudgetControllerSet(address indexed budgetController);
+    /** @notice Event emitted when the Loot Creator address is updated */
+    event LootCreatorUpdated(address oldCreator, address newCreator);
 
 
     // Constructor
@@ -57,6 +59,13 @@ contract LootGauge is Owner, ReentrancyGuard {
         address _lootCreator,
         address _lootReserve
     ) {
+        if(
+            _pal == address(0)
+            || _extraToken == address(0)
+            || _lootCreator == address(0)
+            || _lootReserve == address(0)
+        ) revert Errors.AddressZero();
+
         pal = _pal;
         extraToken = _extraToken;
         lootCreator = _lootCreator;
@@ -108,15 +117,33 @@ contract LootGauge is Owner, ReentrancyGuard {
     * @param palAmount Amount of PAL to send
     * @param extraAmount Amount of extra token to send
     */
-    function sendLootBudget(uint256 palAmount, uint256 extraAmount) external nonReentrant onlyOwner() {
+    function sendLootBudget(uint256 palAmount, uint256 extraAmount) external onlyOwner {
         // Send the budget to the LootReserve
-        IERC20(pal).safeTransfer(lootReserve, palAmount);
+        if(palAmount > 0) {
+            IERC20(pal).safeTransfer(lootReserve, palAmount);
+        }
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }
 
         // Notify the LootCreator of the new budget
         ILootCreator(lootCreator).notifyNewBudget(palAmount, extraAmount);
+    }
+
+    /**
+    * @notice Updates the Loot Creator contract address
+    * @dev Updates the Loot Creator contract address
+    * @param _lootCreator Address of the new Loot Creator contract
+    */
+    function updateLootCreator(address _lootCreator) external onlyOwner {
+        if(_lootCreator == address(0)) revert Errors.InvalidParameter();
+
+        address oldCreator = lootCreator;
+        if(_lootCreator == oldCreator) revert Errors.SameAddress();
+        
+        lootCreator = _lootCreator;
+
+        emit LootCreatorUpdated(oldCreator, _lootCreator);
     }
 
 }

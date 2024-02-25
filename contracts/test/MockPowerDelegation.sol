@@ -14,6 +14,7 @@ contract MockPowerDelegation {
     mapping(uint256 => uint256) public totalLockedAt;
     mapping(address => mapping(uint256 => Point)) public userPoints;
     mapping(address => uint256) public userLocksEnd;
+    mapping(uint256 => uint256) public totalLockedAtTs;
 
     function setAdjustedBalanceAt(address account, uint256 period, uint256 amount) external {
         adjustedBalancesAt[account][period] = amount;
@@ -48,5 +49,14 @@ contract MockPowerDelegation {
 
     function setUserPointAt(address user, uint256 timestamp, Point memory point) external {
         userPoints[user][timestamp] = point;
+    }
+
+    // solhint-disable-next-line
+    function find_total_locked_at(uint256 timestamp) external view returns(uint256) {
+        return totalLockedAtTs[timestamp];
+    }
+    
+    function setTotalLockedAtTs(uint256 timestamp, uint256 amount) external {
+        totalLockedAtTs[timestamp] = amount;
     }
 }

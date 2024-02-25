@@ -14,5 +14,7 @@ interface IHolyPowerDelegation {
     function total_locked() external view returns(uint256);
     // solhint-disable-next-line
     function total_locked_at(uint256 blockNumber) external view returns(uint256);
+    // solhint-disable-next-line
+    function find_total_locked_at(uint256 timestamp) external view returns(uint256);
 
 }

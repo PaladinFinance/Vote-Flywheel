@@ -40,9 +40,14 @@ contract LootBudget is Owner, ReentrancyGuard {
     address immutable public extraToken;
     
     /** @notice Address of the Loot Creator contract */
-    address immutable public lootCreator;
+    address public lootCreator;
     /** @notice Address of the Loot Reserve contract */
     address immutable public lootReserve;
+
+    /** @notice Limit amount of PAL allocated weekly */
+    uint256 public palWeeklyLimit;
+    /** @notice Limit amount of extra token allocated weekly */
+    uint256 public extraWeeklyLimit;
 
     /** @notice Amount of PAL allocated weekly */
     uint256 public palWeeklyBudget;
@@ -55,12 +60,18 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // Events
 
+    /** @notice Event emitted when the PAL weekly limit is updated */
+    event PalWeeklyLimitUpdated(uint256 oldLimit, uint256 newLimit);
+    /** @notice Event emitted when when the extra token weekly limit is updated */
+    event ExtraWeeklyLimitUpdated(uint256 oldLimit, uint256 newLimit);
     /** @notice Event emitted when the PAL weekly budget is updated */
     event PalWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
     /** @notice Event emitted when when the extra token weekly budget is updated */
     event ExtraWeeklyBudgetUpdated(uint256 oldBudget, uint256 newBudget);
     /** @notice Event emitted when the Reserve is canceled and token claimed back */
     event CancelReserve(uint256 retrievedPalAmount, uint256 retrievedExtraAmount);
+    /** @notice Event emitted when the Loot Creator address is updated */
+    event LootCreatorUpdated(address oldCreator, address newCreator);
 
 
     // Constructor
@@ -71,14 +82,25 @@ contract LootBudget is Owner, ReentrancyGuard {
         address _lootCreator,
         address _lootReserve,
         uint256 _palWeeklyBudget,
-        uint256 _extraWeeklyBudget
+        uint256 _extraWeeklyBudget,
+        uint256 _palWeeklyLimit,
+        uint256 _extraWeeklyLimit
     ) {
+        if(
+            _pal == address(0)
+            || _extraToken == address(0)
+            || _lootCreator == address(0)
+            || _lootReserve == address(0)
+        ) revert Errors.AddressZero();
+
         pal = _pal;
         extraToken = _extraToken;
         lootCreator = _lootCreator;
         lootReserve = _lootReserve;
         palWeeklyBudget = _palWeeklyBudget;
         extraWeeklyBudget = _extraWeeklyBudget;
+        palWeeklyLimit = _palWeeklyLimit;
+        extraWeeklyLimit = _extraWeeklyLimit;
     }
 
 
@@ -98,7 +120,9 @@ contract LootBudget is Owner, ReentrancyGuard {
         periodBudgetClaimed[currentPeriod] = true;
 
         // Send the budget to the LootReserve
-        IERC20(pal).safeTransfer(lootReserve, palAmount);
+        if(palAmount > 0) {
+            IERC20(pal).safeTransfer(lootReserve, palAmount);
+        }
         if(extraAmount > 0) {
             IERC20(extraToken).safeTransfer(lootReserve, extraAmount);
         }
@@ -110,12 +134,28 @@ contract LootBudget is Owner, ReentrancyGuard {
 
     // Admin functions
 
+    function setPalWeeklyLimit(uint256 newLimit) external onlyOwner {
+        uint256 oldLimit = palWeeklyLimit;
+        palWeeklyLimit = newLimit;
+
+        emit PalWeeklyLimitUpdated(oldLimit, newLimit);
+    }
+
+    function setExtraWeeklyLimit(uint256 newLimit) external onlyOwner {
+        uint256 oldLimit = extraWeeklyLimit;
+        extraWeeklyLimit = newLimit;
+
+        emit ExtraWeeklyLimitUpdated(oldLimit, newLimit);
+    }
+
     /**
     * @notice Updates the PAL weekly budget
     * @dev Updates the PAL weekly budget
     * @param newBudget new weekly budget amount
     */
-    function updatePalWeeklyBudget(uint256 newBudget) external onlyOwner() {
+    function updatePalWeeklyBudget(uint256 newBudget) external onlyOwner {
+        if(newBudget > palWeeklyLimit) revert Errors.LootBudgetExceedLimit();
+
         uint256 oldBudget = palWeeklyBudget;
         palWeeklyBudget = newBudget;
 
@@ -127,11 +167,29 @@ contract LootBudget is Owner, ReentrancyGuard {
     * @dev Updates the extra token weekly budget
     * @param newBudget new weekly budget amount
     */
-    function updateExtraWeeklyBudget(uint256 newBudget) external onlyOwner() {
+    function updateExtraWeeklyBudget(uint256 newBudget) external onlyOwner {
+        if(newBudget > extraWeeklyLimit) revert Errors.LootBudgetExceedLimit();
+
         uint256 oldBudget = extraWeeklyBudget;
         extraWeeklyBudget = newBudget;
 
         emit ExtraWeeklyBudgetUpdated(oldBudget, newBudget);
+    }
+
+    /**
+    * @notice Updates the Loot Creator contract address
+    * @dev Updates the Loot Creator contract address
+    * @param _lootCreator Address of the new Loot Creator contract
+    */
+    function updateLootCreator(address _lootCreator) external onlyOwner {
+        if(_lootCreator == address(0)) revert Errors.InvalidParameter();
+
+        address oldCreator = lootCreator;
+        if(_lootCreator == oldCreator) revert Errors.SameAddress();
+        
+        lootCreator = _lootCreator;
+
+        emit LootCreatorUpdated(oldCreator, _lootCreator);
     }
 
     /**

@@ -50,15 +50,22 @@ library Errors {
     error ExpiredProxy();
     error ProxyAlreadyActive();
     error ProxyPowerExceeded();
+    error ProxyDurationExceeded();
     error NotAllowedVoteChange();
+    error MaxVoteListExceeded();
+    error MaxProxyListExceeded();
+    error InvalidGaugeCap();
 
     // Loot
     error CreatorAlreadySet();
-    error InvalidId();
-    error VestingNotStarted();
+    error InvalidId(uint256 id);
+    error VestingNotStarted(uint256 id);
 
     // Loot Creator
     error NotListed();
+
+    // Loot Buget
+    error LootBudgetExceedLimit();
 
     //Maths
     error ConversionOverflow();

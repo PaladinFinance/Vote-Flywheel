@@ -9,7 +9,6 @@ import { IERC20__factory } from "../../typechain/factories/@openzeppelin/contrac
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber } from "@ethersproject/bignumber";
-import { parseBalanceMap } from "../utils/merkle/parse-balance-map";
 import BalanceTree from "../utils/merkle/balance-tree";
 
 import {
@@ -430,6 +429,75 @@ describe('MultiMerkleDistributorV2 contract tests - with Loot', () => {
 
         });
 
+        describe('emergencyUpdateQuestPeriod', async () => {
+
+            let new_tree: BalanceTree;
+    
+            const quest_id1 = BigNumber.from(1011)
+    
+            const period = BigNumber.from(1639612800)
+
+            const addedRewardAmount = ethers.utils.parseEther('7')
+    
+            let tree_root: string
+            let new_tree_root: string
+    
+            beforeEach(async () => {
+
+                await distributor.connect(admin).setLootCreator(lootCreator.address)
+    
+                tree = new BalanceTree([
+                    { account: user1.address, amount: user1_claim_amount, questID: quest_id1, period: period },
+                    { account: user2.address, amount: user2_claim_amount, questID: quest_id1, period: period },
+                    { account: user3.address, amount: user3_claim_amount, questID: quest_id1, period: period },
+                    { account: user4.address, amount: user4_claim_amount, questID: quest_id1, period: period },
+                ]); 
+    
+                await distributor.connect(mockQuestBoard).addQuest(quest_id1, CRV.address)
+    
+                new_tree = new BalanceTree([
+                    { account: user1.address, amount: user1_claim_amount, questID: quest_id1, period: period },
+                    { account: user2.address, amount: user2_claim_amount, questID: quest_id1, period: period },
+                    { account: user3.address, amount: user3_claim_amount, questID: quest_id1, period: period }
+                ]);
+    
+                tree_root = tree.getHexRoot()   
+                new_tree_root = new_tree.getHexRoot()
+    
+                await distributor.connect(mockQuestBoard).addQuestPeriod(quest_id1, period, distrib_amount)
+
+                await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id1, period, distrib_amount, tree_root)
+
+                await lootCreator.connect(admin).resetEmergencyNotified()
+    
+            });
+    
+            it(' should notify the Loot Creator correctly', async () => {
+
+                const prev_total = await lootCreator.totalQuestPeriodRewards(quest_id1, period)
+    
+                await distributor.connect(admin).emergencyUpdateQuestPeriod(quest_id1, period, addedRewardAmount, new_tree_root)
+    
+                expect(await lootCreator.totalQuestPeriodRewards(quest_id1, period)).to.be.eq(prev_total.add(addedRewardAmount))
+
+                expect(await lootCreator.emergencyNotified()).to.be.true
+    
+            });
+    
+            it(' should not notify the Loot Creator if amount is 0', async () => {
+
+                const prev_total = await lootCreator.totalQuestPeriodRewards(quest_id1, period)
+    
+                await distributor.connect(admin).emergencyUpdateQuestPeriod(quest_id1, period, 0, new_tree_root)
+    
+                expect(await lootCreator.totalQuestPeriodRewards(quest_id1, period)).to.be.eq(prev_total)
+
+                expect(await lootCreator.emergencyNotified()).to.be.false
+    
+            });
+
+        });
+
     });
 
     describe('No Loot Creator set', async () => {
@@ -707,6 +775,57 @@ describe('MultiMerkleDistributorV2 contract tests - with Loot', () => {
 
                 expect(await lootCreator.userQuestPeriodRewards(quest_id, next_period2, user1.address)).to.be.eq(0)
 
+            });
+
+        });
+
+        describe('emergencyUpdateQuestPeriod', async () => {
+
+            let new_tree: BalanceTree;
+    
+            const quest_id1 = BigNumber.from(1011)
+    
+            const period = BigNumber.from(1639612800)
+
+            const addedRewardAmount = ethers.utils.parseEther('7')
+    
+            let tree_root: string
+            let new_tree_root: string
+    
+            beforeEach(async () => {
+    
+                tree = new BalanceTree([
+                    { account: user1.address, amount: user1_claim_amount, questID: quest_id1, period: period },
+                    { account: user2.address, amount: user2_claim_amount, questID: quest_id1, period: period },
+                    { account: user3.address, amount: user3_claim_amount, questID: quest_id1, period: period },
+                    { account: user4.address, amount: user4_claim_amount, questID: quest_id1, period: period },
+                ]); 
+    
+                await distributor.connect(mockQuestBoard).addQuest(quest_id1, CRV.address)
+    
+                new_tree = new BalanceTree([
+                    { account: user1.address, amount: user1_claim_amount, questID: quest_id1, period: period },
+                    { account: user2.address, amount: user2_claim_amount, questID: quest_id1, period: period },
+                    { account: user3.address, amount: user3_claim_amount, questID: quest_id1, period: period }
+                ]);
+    
+                tree_root = tree.getHexRoot()   
+                new_tree_root = new_tree.getHexRoot()
+    
+                await distributor.connect(mockQuestBoard).addQuestPeriod(quest_id1, period, distrib_amount)
+
+                await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id1, period, distrib_amount, tree_root)
+    
+            });
+    
+            it(' should not notify the Loot Creator', async () => {
+    
+                await distributor.connect(admin).emergencyUpdateQuestPeriod(quest_id1, period, addedRewardAmount, new_tree_root)
+    
+                expect(await lootCreator.totalQuestPeriodRewards(quest_id1, period)).to.be.eq(0)
+
+                expect(await lootCreator.emergencyNotified()).to.be.false
+    
             });
 
         });
