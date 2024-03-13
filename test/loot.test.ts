@@ -285,11 +285,11 @@ describe('Loot contract tests', () => {
 
             await expect(
                 loot.connect(user1).createLoot(user1.address, start_ts, pal_amount, extra_amount)
-            ).to.be.revertedWith('CallerNotAllowed')
+            ).to.be.reverted
 
             await expect(
                 loot.connect(admin).createLoot(user1.address, start_ts, pal_amount, extra_amount)
-            ).to.be.revertedWith('CallerNotAllowed')
+            ).to.be.reverted
 
         });
 

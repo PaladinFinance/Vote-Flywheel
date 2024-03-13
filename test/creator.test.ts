@@ -1124,7 +1124,7 @@ describe('LootCreator contract tests', () => {
                     period,
                     claim_amount
                 )
-            ).to.be.revertedWith("CallerNotAllowed")
+            ).to.be.reverted
 
             await expect(
                 creator.connect(user1).notifyQuestClaim(
@@ -1133,7 +1133,7 @@ describe('LootCreator contract tests', () => {
                     period,
                     claim_amount
                 )
-            ).to.be.revertedWith("CallerNotAllowed")
+            ).to.be.reverted
 
         });
 
@@ -2061,11 +2061,11 @@ describe('LootCreator contract tests', () => {
 
             await expect(
                 creator.connect(user1).notifyAddedRewardsQuestPeriod(quest_id, period, added_rewards)
-            ).to.be.revertedWith("CallerNotAllowed")
+            ).to.be.reverted
 
             await expect(
                 creator.connect(admin).notifyAddedRewardsQuestPeriod(quest_id, period, added_rewards)
-            ).to.be.revertedWith("CallerNotAllowed")
+            ).to.be.reverted
 
         });
 

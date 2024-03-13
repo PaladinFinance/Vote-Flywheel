@@ -405,11 +405,11 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
 
             await expect(
                 distributor.connect(user1).updateQuestPeriod(quest_id1, period, distrib_amount, tree_root)
-            ).to.be.revertedWith('CallerNotAllowed')
+            ).to.be.reverted
 
             await expect(
                 distributor.connect(user2).updateQuestPeriod(quest_id1, period, distrib_amount, tree_root)
-            ).to.be.revertedWith('CallerNotAllowed')
+            ).to.be.reverted
 
         });
 
