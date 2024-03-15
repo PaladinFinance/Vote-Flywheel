@@ -875,6 +875,7 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
 
         let tree2: BalanceTree;
         let tree3: BalanceTree;
+        let tree2_2: BalanceTree;
 
         let total2 = ethers.utils.parseEther('72')
         let total3 = ethers.utils.parseEther('65')
@@ -905,6 +906,12 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
                 { account: user4.address, amount: user_claims[3][1], questID: quest_id2, period: period },
             ]);
 
+            tree2_2 = new BalanceTree([
+                { account: user1.address, amount: user_claims[0][1], questID: quest_id2, period: next_period },
+                { account: user2.address, amount: user_claims[1][1], questID: quest_id2, period: next_period },
+                { account: user4.address, amount: user_claims[3][1], questID: quest_id2, period: next_period },
+            ]);
+
             tree3 = new BalanceTree([
                 { account: user1.address, amount: user_claims[0][2], questID: quest_id3, period: next_period },
                 { account: user2.address, amount: user_claims[1][2], questID: quest_id3, period: next_period },
@@ -919,12 +926,16 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
             await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id2, period, total2, tree2.getHexRoot())
             await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id3, next_period, total3, tree3.getHexRoot())
 
-            await CRV.connect(admin).transfer(distributor.address, distrib_amount.mul(2))
+            await CRV.connect(admin).transfer(distributor.address, distrib_amount.mul(3))
             await DAI.connect(admin).transfer(distributor.address, distrib_amount)
 
         });
 
         it(' should claim for 2 different Quests', async () => {
+
+            const prev_user_balance_1 = await CRV.balanceOf(user1.address)
+
+            const expected_total = user_claims[0][0].add(user_claims[0][1])
 
             let claim_params = [
                 { 
@@ -955,9 +966,13 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
             expect(await distributor.questRewardsPerPeriod(quest_id1, period)).to.be.eq(distrib_amount.sub(user_claims[0][0]))
             expect(await distributor.questRewardsPerPeriod(quest_id2, period)).to.be.eq(total2.sub(user_claims[0][1]))
 
+            expect(await CRV.balanceOf(user1.address)).to.be.eq(prev_user_balance_1.add(expected_total))
+
         });
 
         it(' should claim from different periods from same Quest', async () => {
+
+            const prev_user_balance_1 = await CRV.balanceOf(user4.address)
 
             let tree4 = new BalanceTree([
                 { account: user1.address, amount: ethers.utils.parseEther('20'), questID: quest_id2, period: next_period },
@@ -968,6 +983,8 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
             await distributor.connect(mockQuestBoard).addQuestPeriod(quest_id2, next_period, ethers.utils.parseEther('39'))
 
             await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id2, next_period, ethers.utils.parseEther('39'), tree4.getHexRoot())
+
+            const expected_total = user_claims[3][1].add(ethers.utils.parseEther('15'))
 
             let claim_params = [
                 { 
@@ -998,9 +1015,14 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
             expect(await distributor.questRewardsPerPeriod(quest_id2, period)).to.be.eq(total2.sub(user_claims[3][1]))
             expect(await distributor.questRewardsPerPeriod(quest_id2, next_period)).to.be.eq(ethers.utils.parseEther('24'))
 
+            expect(await CRV.balanceOf(user4.address)).to.be.eq(prev_user_balance_1.add(expected_total))
+
         });
 
         it(' should claim from different periods from different Quests', async () => {
+
+            const prev_user_balance_1 = await CRV.balanceOf(user2.address)
+            const prev_user_balance_2 = await DAI.balanceOf(user2.address)
 
             let claim_params = [
                 { 
@@ -1030,6 +1052,58 @@ describe('MultiMerkleDistributorV2 contract tests - without Loot', () => {
 
             expect(await distributor.questRewardsPerPeriod(quest_id2, period)).to.be.eq(total2.sub(user_claims[1][1]))
             expect(await distributor.questRewardsPerPeriod(quest_id3, next_period)).to.be.eq(total3.sub(user_claims[1][2]))
+
+            expect(await CRV.balanceOf(user2.address)).to.be.eq(prev_user_balance_1.add(user_claims[1][1]))
+            expect(await DAI.balanceOf(user2.address)).to.be.eq(prev_user_balance_2.add(user_claims[1][2]))
+
+        });
+
+        it(' should claim from different periods from different Quests - mixed tokens', async () => {
+            await distributor.connect(mockQuestBoard).addQuestPeriod(quest_id2, next_period, total2)
+            await distributor.connect(mockQuestBoard).updateQuestPeriod(quest_id2, next_period, total2, tree2_2.getHexRoot())
+
+            const prev_user_balance_1 = await CRV.balanceOf(user2.address)
+            const prev_user_balance_2 = await DAI.balanceOf(user2.address)
+
+            let claim_params = [
+                { 
+                    questID: quest_id2,
+                    period: period,
+                    index: 1,
+                    amount: user_claims[1][1],
+                    merkleProof: tree2.getProof(quest_id2, period, 1, user2.address, user_claims[1][1])
+                },
+                { 
+                    questID: quest_id2,
+                    period: next_period,
+                    index: 1,
+                    amount: user_claims[1][1],
+                    merkleProof: tree2_2.getProof(quest_id2, next_period, 1, user2.address, user_claims[1][1])
+                },
+                { 
+                    questID: quest_id3,
+                    period: next_period,
+                    index: 1,
+                    amount: user_claims[1][2],
+                    merkleProof: tree3.getProof(quest_id3, next_period, 1, user2.address, user_claims[1][2])
+                }
+            ]
+
+            await distributor.connect(user2).multiClaim(user2.address, claim_params)
+
+            expect(await distributor.isClaimed(quest_id2, period, 1)).to.be.true
+            expect(await distributor.isClaimed(quest_id2, next_period, 1)).to.be.true
+            expect(await distributor.isClaimed(quest_id3, next_period, 1)).to.be.true
+
+            expect(await distributor.isClaimed(quest_id1, period, 1)).to.be.false
+            expect(await distributor.isClaimed(quest_id1, period, 0)).to.be.false
+
+            expect(await distributor.questRewardsPerPeriod(quest_id2, period)).to.be.eq(total2.sub(user_claims[1][1]))
+            expect(await distributor.questRewardsPerPeriod(quest_id2, next_period)).to.be.eq(total2.sub(user_claims[1][1]))
+            expect(await distributor.questRewardsPerPeriod(quest_id3, next_period)).to.be.eq(total3.sub(user_claims[1][2]))
+
+            expect(await CRV.balanceOf(user2.address)).to.be.eq(prev_user_balance_1.add(user_claims[1][1]).add(user_claims[1][1]))
+            expect(await DAI.balanceOf(user2.address)).to.be.eq(prev_user_balance_2.add(user_claims[1][2]))
 
         });
 

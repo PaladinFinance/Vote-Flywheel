@@ -112,6 +112,11 @@ async function main() {
     console.log('Set LootCreator in Loot ...')
     tx = await loot.setInitialLootCreator(creator.address)
     await tx.wait(10)
+
+    // left to do : list Boards & Distributors
+    // set Creator in Distributors
+    // list gauges
+    // send PAL to Budget
     
 }
 

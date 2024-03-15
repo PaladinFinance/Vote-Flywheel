@@ -186,13 +186,47 @@ contract MultiMerkleDistributorV2 is Owner, ReentrancyGuard {
     */
     function multiClaim(address account, ClaimParams[] calldata claims) external {
         uint256 length = claims.length;
-        
+
         if(length == 0) revert Errors.EmptyParameters();
+        if(account == address(0)) revert Errors.AddressZero();
+
+        address lastToken;
+        uint256 transferAmount;
 
         for(uint256 i; i < length;){
-            claim(claims[i].questID, claims[i].period, claims[i].index, account, claims[i].amount, claims[i].merkleProof);
+            if(questMerkleRootPerPeriod[claims[i].questID][claims[i].period] == 0) revert Errors.MerkleRootNotUpdated();
+            if(isClaimed(claims[i].questID, claims[i].period, claims[i].index)) revert Errors.AlreadyClaimed();
+
+            // Check that the given parameters match the given Proof
+            bytes32 node = keccak256(abi.encodePacked(claims[i].questID, claims[i].period, claims[i].index, account, claims[i].amount));
+            if(!MerkleProof.verify(claims[i].merkleProof, questMerkleRootPerPeriod[claims[i].questID][claims[i].period], node)) revert Errors.InvalidProof();
+
+            // Set the rewards as claimed for that period
+            // And transfer the rewards to the user
+            address rewardToken = questRewardToken[claims[i].questID];
+            _setClaimed(claims[i].questID, claims[i].period, claims[i].index);
+            questRewardsPerPeriod[claims[i].questID][claims[i].period] -= claims[i].amount;
+
+            _triggerCreateLoot(account, claims[i].questID, claims[i].period, claims[i].amount);
+
+            emit Claimed(claims[i].questID, claims[i].period, claims[i].index, claims[i].amount, rewardToken, account);
+
+            if(rewardToken != lastToken){
+                if(lastToken != address(0)){
+                    IERC20(lastToken).safeTransfer(account, transferAmount);
+                    transferAmount = 0;
+                }
+                lastToken = rewardToken;
+                transferAmount += claims[i].amount;
+            } else {
+                transferAmount += claims[i].amount;
+            }
 
             unchecked{ ++i; }
+        }
+
+        if(lastToken != address(0) && transferAmount != 0){
+            IERC20(lastToken).safeTransfer(account, transferAmount);
         }
     }
 
