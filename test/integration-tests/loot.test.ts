@@ -446,7 +446,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             const prev_budget_period = await creator.nextBudgetUpdatePeriod()
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(closed_period)
 
@@ -513,7 +513,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(gauge_pal_amount).add(over_cap_pal_amount2))
             expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(gauge_extra_amount).add(over_cap_extra_amount2))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(unused_pal_amount2))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(unused_extra_amount2))
@@ -573,7 +573,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id1, distributor1.address, closed_period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(voter1.address)).length
 
@@ -616,7 +616,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims1[1]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims1[1]).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -628,7 +628,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const prev_pal_balance = await pal.balanceOf(voter1.address)
             const prev_extra_balance = await extraToken.balanceOf(voter1.address)
 
-            const prev_slashed_total = (await creator.pengingBudget()).palAmount
+            const prev_slashed_total = (await creator.pendingBudget()).palAmount
 
             const tx2 = await loot.connect(voter1).claimLoot(loot_id, voter1.address)
 
@@ -642,7 +642,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_pal_balance).to.be.eq(prev_pal_balance.add(loot_data.palAmount))
             expect(new_extra_balance).to.be.eq(prev_extra_balance.add(loot_data.extraAmount))
 
-            expect((await creator.pengingBudget()).palAmount).to.be.eq(prev_slashed_total)
+            expect((await creator.pendingBudget()).palAmount).to.be.eq(prev_slashed_total)
 
             expect(tx2).to.emit(loot, 'LootClaimed').withArgs(voter1.address, loot_id, loot_data.palAmount, loot_data.extraAmount)
 
@@ -666,7 +666,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id2, distributor2.address, closed_period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(voter2.address)).length
 
@@ -696,7 +696,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(voter2.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -708,7 +708,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const prev_pal_balance = await pal.balanceOf(voter2.address)
             const prev_extra_balance = await extraToken.balanceOf(voter2.address)
 
-            const prev_slashed_total = (await creator.pengingBudget()).palAmount
+            const prev_slashed_total = (await creator.pendingBudget()).palAmount
 
             const tx2 = await loot.connect(voter2).claimLoot(loot_id, voter2.address)
 
@@ -722,7 +722,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_pal_balance).to.be.eq(prev_pal_balance.add(loot_data.palAmount))
             expect(new_extra_balance).to.be.eq(prev_extra_balance.add(loot_data.extraAmount))
 
-            expect((await creator.pengingBudget()).palAmount).to.be.eq(prev_slashed_total)
+            expect((await creator.pendingBudget()).palAmount).to.be.eq(prev_slashed_total)
 
             expect(tx2).to.emit(loot, 'LootClaimed').withArgs(voter2.address, loot_id, loot_data.palAmount, loot_data.extraAmount)
 
@@ -745,7 +745,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id1, distributor1.address, closed_period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -778,7 +778,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -790,7 +790,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const prev_pal_balance = await pal.balanceOf(user1.address)
             const prev_extra_balance = await extraToken.balanceOf(user1.address)
 
-            const prev_slashed_total = (await creator.pengingBudget()).palAmount
+            const prev_slashed_total = (await creator.pendingBudget()).palAmount
 
             const tx2 = await loot.connect(user1).claimLoot(loot_id, user1.address)
 
@@ -804,7 +804,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_pal_balance).to.be.eq(prev_pal_balance.add(loot_data.palAmount))
             expect(new_extra_balance).to.be.eq(prev_extra_balance.add(loot_data.extraAmount))
 
-            expect((await creator.pengingBudget()).palAmount).to.be.eq(prev_slashed_total)
+            expect((await creator.pendingBudget()).palAmount).to.be.eq(prev_slashed_total)
 
             expect(tx2).to.emit(loot, 'LootClaimed').withArgs(user1.address, loot_id, loot_data.palAmount, loot_data.extraAmount)
 
@@ -828,7 +828,7 @@ describe('Loot - Voting & Loot creation tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id1, distributor1.address, closed_period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -861,7 +861,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -873,7 +873,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             const prev_pal_balance = await pal.balanceOf(user1.address)
             const prev_extra_balance = await extraToken.balanceOf(user1.address)
 
-            const prev_slashed_total = (await creator.pengingBudget()).palAmount
+            const prev_slashed_total = (await creator.pendingBudget()).palAmount
 
             const tx2 = await loot.connect(user1).claimLoot(loot_id, user1.address)
             const tx_ts2 = BigNumber.from((await provider.getBlock((await tx2).blockNumber || 0)).timestamp)
@@ -891,7 +891,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_pal_balance).to.be.eq(prev_pal_balance.add(claim_pal_amount))
             expect(new_extra_balance).to.be.eq(prev_extra_balance.add(loot_data.extraAmount))
 
-            expect((await creator.pengingBudget()).palAmount).to.be.eq(prev_slashed_total.add(expected_slash_amount))
+            expect((await creator.pendingBudget()).palAmount).to.be.eq(prev_slashed_total.add(expected_slash_amount))
 
             expect(tx2).to.emit(loot, 'LootClaimed').withArgs(user1.address, loot_id, claim_pal_amount, loot_data.extraAmount)
 

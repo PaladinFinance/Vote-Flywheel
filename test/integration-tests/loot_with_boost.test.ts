@@ -461,7 +461,7 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id2, distributor2.address, closed_period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user3.address)).length
 
@@ -504,7 +504,7 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims2[2]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims2[2]).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -516,7 +516,7 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
             const prev_pal_balance = await pal.balanceOf(user3.address)
             const prev_extra_balance = await extraToken.balanceOf(user3.address)
 
-            const prev_slashed_total = (await creator.pengingBudget()).palAmount
+            const prev_slashed_total = (await creator.pendingBudget()).palAmount
 
             const tx2 = await loot.connect(user3).claimLoot(loot_id, user3.address)
 
@@ -530,7 +530,7 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
             expect(new_pal_balance).to.be.eq(prev_pal_balance.add(loot_data.palAmount))
             expect(new_extra_balance).to.be.eq(prev_extra_balance.add(loot_data.extraAmount))
 
-            expect((await creator.pengingBudget()).palAmount).to.be.eq(prev_slashed_total)
+            expect((await creator.pendingBudget()).palAmount).to.be.eq(prev_slashed_total)
 
             expect(tx2).to.emit(loot, 'LootClaimed').withArgs(user3.address, loot_id, loot_data.palAmount, loot_data.extraAmount)
 

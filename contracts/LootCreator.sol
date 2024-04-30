@@ -93,7 +93,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     uint256 public nextBudgetUpdatePeriod;
 
     /** @notice Current pending budget to be used during next period */
-    Budget public pengingBudget;
+    Budget public pendingBudget;
 
     /** @notice Budgets for each period */
     mapping(uint256 => Budget) public periodBudget;
@@ -330,8 +330,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
             uint128 unusedPal = uint128(uint256(budget.palAmount) * unusedWeight / UNIT);
             uint128 unusedExtra = uint128(uint256(budget.extraAmount) * unusedWeight / UNIT);
 
-            pengingBudget.palAmount += unusedPal;
-            pengingBudget.extraAmount += unusedExtra;
+            pendingBudget.palAmount += unusedPal;
+            pendingBudget.extraAmount += unusedExtra;
             allocatedBudgetHistory[period].palAmount += unusedPal;
             allocatedBudgetHistory[period].extraAmount += unusedExtra;
         }
@@ -368,7 +368,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     */
 	function notifyUndistributedRewards(uint256 palAmount) external onlyLoot {
         // Add undistributed rewards from Loot to the pending budget
-        pengingBudget.palAmount += uint128(palAmount);
+        pendingBudget.palAmount += uint128(palAmount);
     }
 
     /**
@@ -379,8 +379,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     */
 	function notifyNewBudget(uint256 palAmount, uint256 extraAmount) external onlyGauge {
         // Update the pending budget with the new budget from the gauge
-        pengingBudget.palAmount += uint128(palAmount);
-        pengingBudget.extraAmount += uint128(extraAmount);
+        pendingBudget.palAmount += uint128(palAmount);
+        pendingBudget.extraAmount += uint128(extraAmount);
     }
 
     /**
@@ -472,8 +472,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         while (nextBudgetUpdatePeriod <= block.timestamp) {
 
             // Update the current period budget
-            Budget memory pending = pengingBudget;
-            pengingBudget = Budget(0, 0);
+            Budget memory pending = pendingBudget;
+            pendingBudget = Budget(0, 0);
 
             // 2 weeks difference to not impact the current distribution and allocations
             uint256 lastFinishedPeriod = nextBudgetUpdatePeriod - (WEEK * 2);
@@ -537,10 +537,10 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
         // Retrieve unallocated rewards
         if(vars.userMultiplier < MAX_MULTIPLIER) {
-            pengingBudget.palAmount += uint128(
+            pendingBudget.palAmount += uint128(
                 ((uint256(allocation.palPerVote) * (MAX_MULTIPLIER - vars.userMultiplier) / UNIT) * vars.userPeriodRewards / UNIT)
             );
-            pengingBudget.extraAmount += uint128(
+            pendingBudget.extraAmount += uint128(
                 ((uint256(allocation.extraPerVote) * (MAX_MULTIPLIER - vars.userMultiplier) / UNIT) * vars.userPeriodRewards / UNIT)
             );
         }

@@ -723,7 +723,7 @@
   },
   {
     "inputs": [],
-    "name": "pengingBudget",
+    "name": "pendingBudget",
     "outputs": [
       {
         "internalType": "uint128",

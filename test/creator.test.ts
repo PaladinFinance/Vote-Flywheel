@@ -162,8 +162,8 @@ describe('LootCreator contract tests', () => {
         
         expect(await creator.lootGauge()).to.be.eq(ethers.constants.AddressZero)
 
-        expect((await creator.pengingBudget()).palAmount).to.be.eq(0)
-        expect((await creator.pengingBudget()).extraAmount).to.be.eq(0)
+        expect((await creator.pendingBudget()).palAmount).to.be.eq(0)
+        expect((await creator.pendingBudget()).extraAmount).to.be.eq(0)
 
     });
 
@@ -448,11 +448,11 @@ describe('LootCreator contract tests', () => {
             const pal_amount = ethers.utils.parseEther("2150")
             const extra_amount = ethers.utils.parseEther("3500")
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             await creator.connect(otherGauge).notifyNewBudget(pal_amount, extra_amount)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(pal_amount))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(extra_amount))
@@ -464,11 +464,11 @@ describe('LootCreator contract tests', () => {
             const pal_amount = ethers.utils.parseEther("2150")
             const extra_amount = ethers.utils.parseEther("0")
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             await creator.connect(otherGauge).notifyNewBudget(pal_amount, extra_amount)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(pal_amount))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -511,7 +511,7 @@ describe('LootCreator contract tests', () => {
 
             expect(new_period).to.be.eq(prev_period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
@@ -540,7 +540,7 @@ describe('LootCreator contract tests', () => {
 
             expect(new_period).to.be.eq(prev_period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
@@ -573,7 +573,7 @@ describe('LootCreator contract tests', () => {
 
             expect(new_period).to.be.eq(prev_period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
@@ -651,7 +651,7 @@ describe('LootCreator contract tests', () => {
 
             expect(new_period).to.be.eq(prev_period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
             expect(new_pending_budget.palAmount).to.be.eq(0)
             expect(new_pending_budget.extraAmount).to.be.eq(0)
 
@@ -804,7 +804,7 @@ describe('LootCreator contract tests', () => {
 
             const prev_period_allocated = await creator.allocatedBudgetHistory(period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             await distributor.connect(admin).sendNotifyDistributedQuestPeriod(
                 creator.address,
@@ -836,7 +836,7 @@ describe('LootCreator contract tests', () => {
             expect(new_period_allocated.palAmount).to.be.eq(prev_period_allocated.palAmount.add(over_cap_pal_amount))
             expect(new_period_allocated.extraAmount).to.be.eq(prev_period_allocated.extraAmount.add(over_cap_extra_amount))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(unused_pal_amount))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(unused_extra_amount))
@@ -1221,7 +1221,7 @@ describe('LootCreator contract tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1254,7 +1254,7 @@ describe('LootCreator contract tests', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -1267,7 +1267,7 @@ describe('LootCreator contract tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1305,7 +1305,7 @@ describe('LootCreator contract tests', () => {
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(undistributed_pal))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount.add(undistributed_extra))
@@ -1317,7 +1317,7 @@ describe('LootCreator contract tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1347,7 +1347,7 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -1360,7 +1360,7 @@ describe('LootCreator contract tests', () => {
 
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1390,7 +1390,7 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -1399,7 +1399,7 @@ describe('LootCreator contract tests', () => {
 
         it(' should not create if no rewards claimed from this Quest period', async () => {
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1416,7 +1416,7 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).not.to.emit(loot, 'LootCreated')
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -1425,7 +1425,7 @@ describe('LootCreator contract tests', () => {
 
         it(' should not create if the given gauge is not listed', async () => {
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1442,7 +1442,7 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).not.to.emit(loot, 'LootCreated')
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -1451,7 +1451,7 @@ describe('LootCreator contract tests', () => {
 
         it(' should not create if the given distributor is not listed', async () => {
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1468,7 +1468,7 @@ describe('LootCreator contract tests', () => {
 
             expect(tx).not.to.emit(loot, 'LootCreated')
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount)
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
@@ -1503,7 +1503,7 @@ describe('LootCreator contract tests', () => {
             const gauge_allocation = await creator.getGaugeBudgetForPeriod(questGauge1.address, period)
             const quest_allocation = await creator.getQuestAllocationForPeriod(quest_id, distributor.address, period)
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const expected_pal_amount1 = quest_allocation.palPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount).div(UNIT)
             const expected_extra_amount1 = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1740,7 +1740,7 @@ describe('LootCreator contract tests', () => {
 
             // before
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const prev_user_loot_count = (await loot.getAllUserLoot(user1.address)).length
 
@@ -1862,7 +1862,7 @@ describe('LootCreator contract tests', () => {
 
             // general 2
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(
                 prev_pending_budget.palAmount.add(undistributed_pal1).add(undistributed_pal2).add(undistributed_pal3)
@@ -1966,7 +1966,7 @@ describe('LootCreator contract tests', () => {
 
         it(' should add the slashed pal amount to the pending budget correctly', async () => {
 
-            const prev_pending_budget = await creator.pengingBudget()
+            const prev_pending_budget = await creator.pendingBudget()
 
             const tx = await loot.connect(user1).claimLoot(loot_id, user1.address)
             const tx_ts = BigNumber.from((await provider.getBlock((await tx).blockNumber || 0)).timestamp)
@@ -1975,7 +1975,7 @@ describe('LootCreator contract tests', () => {
 
             const expected_slash_amount = loot_data.palAmount.mul(loot_data.endTs.sub(tx_ts)).div(vesting_duration)
 
-            const new_pending_budget = await creator.pengingBudget()
+            const new_pending_budget = await creator.pendingBudget()
 
             expect(new_pending_budget.palAmount).to.be.eq(prev_pending_budget.palAmount.add(expected_slash_amount))
             expect(new_pending_budget.extraAmount).to.be.eq(prev_pending_budget.extraAmount)
