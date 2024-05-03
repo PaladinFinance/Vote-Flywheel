@@ -612,6 +612,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(voter1.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(voter1.address, quest_id1, closed_period, loot_id)
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims1[1]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims1[1]).div(UNIT)
@@ -695,6 +696,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(voter2.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(voter2.address, quest_id2, closed_period, loot_id)
 
             const new_pending_budget = await creator.pendingBudget()
 
@@ -774,6 +776,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id1, closed_period, loot_id)
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
@@ -857,6 +860,7 @@ describe('Loot - Voting & Loot creation tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id1, closed_period, loot_id)
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(user_claims1[0]).div(UNIT)

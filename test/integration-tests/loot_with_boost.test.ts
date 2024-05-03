@@ -500,6 +500,7 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user3.address, loot_id, expected_pal_amount, expected_extra_amount, closed_period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user3.address, quest_id2, closed_period, loot_id)
 
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims2[2]).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(user_claims2[2]).div(UNIT)
