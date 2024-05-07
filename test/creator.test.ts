@@ -78,12 +78,15 @@ describe('LootCreator contract tests', () => {
     let otherDistrib1: SignerWithAddress
     let otherDistrib2: SignerWithAddress
 
+    let otherBoard1: SignerWithAddress
+    let otherBoard2: SignerWithAddress
+
     const vesting_duration = BigNumber.from(86400 * 7 * 2)
 
     before(async () => {
         await resetFork();
 
-        [admin, user1, user2, user3, reserve, questGauge1, questGauge2, questGauge3, otherGauge, otherDistrib1, otherDistrib2] = await ethers.getSigners();
+        [admin, user1, user2, user3, reserve, questGauge1, questGauge2, questGauge3, otherGauge, otherDistrib1, otherDistrib2, otherBoard1, otherBoard2] = await ethers.getSigners();
 
         lootFactory = await ethers.getContractFactory("Loot");
         creatorFactory = await ethers.getContractFactory("LootCreator");
@@ -218,11 +221,12 @@ describe('LootCreator contract tests', () => {
             expect(await creator.allowedDistributors(distributor.address)).to.be.false
             expect((await creator.getListedDistributors()).length).to.be.eq(0)
 
-            const tx = await creator.connect(admin).addDistributor(distributor.address)
+            const tx = await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             expect(await creator.allowedDistributors(distributor.address)).to.be.true
             expect(await creator.distributors(0)).to.be.eq(distributor.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(1)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
 
             await expect(tx).to.emit(creator, 'NewDistributorListed').withArgs(distributor.address)
 
@@ -234,18 +238,24 @@ describe('LootCreator contract tests', () => {
             expect(await creator.allowedDistributors(otherDistrib1.address)).to.be.false
             expect(await creator.allowedDistributors(otherDistrib2.address)).to.be.false
             expect((await creator.getListedDistributors()).length).to.be.eq(0)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(ethers.constants.AddressZero)
 
-            const tx1 = await creator.connect(admin).addDistributor(distributor.address)
+            const tx1 = await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             expect(await creator.allowedDistributors(distributor.address)).to.be.true
             expect(await creator.allowedDistributors(otherDistrib1.address)).to.be.false
             expect(await creator.allowedDistributors(otherDistrib2.address)).to.be.false
             expect(await creator.distributors(0)).to.be.eq(distributor.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(1)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(ethers.constants.AddressZero)
 
             await expect(tx1).to.emit(creator, 'NewDistributorListed').withArgs(distributor.address)
 
-            const tx2 = await creator.connect(admin).addDistributor(otherDistrib1.address)
+            const tx2 = await creator.connect(admin).addDistributor(otherDistrib1.address, otherBoard1.address)
 
             expect(await creator.allowedDistributors(distributor.address)).to.be.true
             expect(await creator.allowedDistributors(otherDistrib1.address)).to.be.true
@@ -253,10 +263,13 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(0)).to.be.eq(distributor.address)
             expect(await creator.distributors(1)).to.be.eq(otherDistrib1.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(2)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(ethers.constants.AddressZero)
 
             await expect(tx2).to.emit(creator, 'NewDistributorListed').withArgs(otherDistrib1.address)
 
-            const tx3 = await creator.connect(admin).addDistributor(otherDistrib2.address)
+            const tx3 = await creator.connect(admin).addDistributor(otherDistrib2.address, otherBoard2.address)
 
             expect(await creator.allowedDistributors(distributor.address)).to.be.true
             expect(await creator.allowedDistributors(otherDistrib1.address)).to.be.true
@@ -265,6 +278,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib1.address)
             expect(await creator.distributors(2)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(3)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             await expect(tx3).to.emit(creator, 'NewDistributorListed').withArgs(otherDistrib2.address)
 
@@ -272,10 +288,10 @@ describe('LootCreator contract tests', () => {
 
         it(' should fail if distributor already listed', async () => {
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await expect(
-                creator.connect(admin).addDistributor(distributor.address)
+                creator.connect(admin).addDistributor(distributor.address, board.address)
             ).to.be.revertedWith("AlreadyListed")
 
         });
@@ -283,7 +299,11 @@ describe('LootCreator contract tests', () => {
         it(' should fail if given an incorrect parameter', async () => {
 
             await expect(
-                creator.connect(admin).addDistributor(ethers.constants.AddressZero)
+                creator.connect(admin).addDistributor(ethers.constants.AddressZero, board.address)
+            ).to.be.revertedWith("AddressZero")
+
+            await expect(
+                creator.connect(admin).addDistributor(distributor.address, ethers.constants.AddressZero)
             ).to.be.revertedWith("AddressZero")
 
         });
@@ -291,11 +311,11 @@ describe('LootCreator contract tests', () => {
         it(' should only be allowed for owner', async () => {
 
             await expect(
-                creator.connect(reserve).addDistributor(distributor.address)
+                creator.connect(reserve).addDistributor(distributor.address, board.address)
             ).to.be.reverted
 
             await expect(
-                creator.connect(user1).addDistributor(distributor.address)
+                creator.connect(user1).addDistributor(distributor.address, board.address)
             ).to.be.reverted
 
         });
@@ -306,9 +326,9 @@ describe('LootCreator contract tests', () => {
 
         beforeEach(async () => {
 
-            await creator.connect(admin).addDistributor(distributor.address)
-            await creator.connect(admin).addDistributor(otherDistrib1.address)
-            await creator.connect(admin).addDistributor(otherDistrib2.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
+            await creator.connect(admin).addDistributor(otherDistrib1.address, otherBoard1.address)
+            await creator.connect(admin).addDistributor(otherDistrib2.address, otherBoard2.address)
 
         });
 
@@ -321,6 +341,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib1.address)
             expect(await creator.distributors(2)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(3)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             const tx = await creator.connect(admin).removeDistributor(otherDistrib1.address)
 
@@ -331,6 +354,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(2)
             expect(await creator.getListedDistributors()).not.to.include(otherDistrib1.address)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             await expect(tx).to.emit(creator, 'DistributorUnlisted').withArgs(otherDistrib1.address)
 
@@ -345,6 +371,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib1.address)
             expect(await creator.distributors(2)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(3)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             const tx = await creator.connect(admin).removeDistributor(otherDistrib1.address)
 
@@ -355,6 +384,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(2)
             expect(await creator.getListedDistributors()).not.to.include(otherDistrib1.address)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             await expect(tx).to.emit(creator, 'DistributorUnlisted').withArgs(otherDistrib1.address)
 
@@ -366,6 +398,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(0)).to.be.eq(distributor.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(1)
             expect(await creator.getListedDistributors()).not.to.include(otherDistrib2.address)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(ethers.constants.AddressZero)
 
             await expect(tx2).to.emit(creator, 'DistributorUnlisted').withArgs(otherDistrib2.address)
 
@@ -380,6 +415,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib1.address)
             expect(await creator.distributors(2)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(3)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
             await creator.connect(admin).removeDistributor(otherDistrib1.address)
 
@@ -390,8 +428,11 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib2.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(2)
             expect(await creator.getListedDistributors()).not.to.include(otherDistrib1.address)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(ethers.constants.AddressZero)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
-            await creator.connect(admin).addDistributor(otherDistrib1.address)
+            await creator.connect(admin).addDistributor(otherDistrib1.address, otherBoard1.address)
 
             expect(await creator.allowedDistributors(distributor.address)).to.be.true
             expect(await creator.allowedDistributors(otherDistrib1.address)).to.be.true
@@ -400,6 +441,9 @@ describe('LootCreator contract tests', () => {
             expect(await creator.distributors(1)).to.be.eq(otherDistrib2.address)
             expect(await creator.distributors(2)).to.be.eq(otherDistrib1.address)
             expect((await creator.getListedDistributors()).length).to.be.eq(3)
+            expect(await creator.distributorsBoards(distributor.address)).to.be.eq(board.address)
+            expect(await creator.distributorsBoards(otherDistrib1.address)).to.be.eq(otherBoard1.address)
+            expect(await creator.distributorsBoards(otherDistrib2.address)).to.be.eq(otherBoard2.address)
 
         });
 
@@ -439,7 +483,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(otherGauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
         });
 
@@ -493,7 +537,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await advanceTime(WEEK.toNumber())
 
@@ -681,7 +725,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await advanceTime(WEEK.toNumber())
 
@@ -928,7 +972,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await advanceTime(WEEK.toNumber())
 
@@ -1030,7 +1074,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await advanceTime(WEEK.toNumber())
 
@@ -1161,7 +1205,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
 
@@ -1608,7 +1652,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
 
@@ -1896,7 +1940,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await distributor.connect(admin).setQuestRewardToken(quest_id, questRewardToken.address)
 
@@ -1999,7 +2043,7 @@ describe('LootCreator contract tests', () => {
 
             await creator.connect(admin).init(gauge.address)
 
-            await creator.connect(admin).addDistributor(distributor.address)
+            await creator.connect(admin).addDistributor(distributor.address, board.address)
 
             await advanceTime(WEEK.toNumber())
 
