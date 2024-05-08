@@ -1250,6 +1250,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period, loot_id)
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(BASE_MULTIPLIER)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1301,6 +1302,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period, loot_id)
             
             const undistributed_pal = quest_allocation.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra = quest_allocation.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1346,6 +1348,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period, loot_id)
 
             const new_pending_budget = await creator.pendingBudget()
 
@@ -1389,6 +1392,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id, expected_pal_amount, expected_extra_amount, period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period, loot_id)
 
             const new_pending_budget = await creator.pendingBudget()
 
@@ -1799,6 +1803,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot1.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id1, expected_pal_amount1, expected_extra_amount1, period.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period, loot_id1)
             
             const undistributed_pal1 = quest_allocation1.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier1)).div(UNIT).mul(claim_amount).div(UNIT)
             const undistributed_extra1 = quest_allocation1.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier1)).div(UNIT).mul(claim_amount).div(UNIT)
@@ -1827,6 +1832,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot2.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id2, expected_pal_amount2, expected_extra_amount2, period2.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period2, loot_id2)
             
             const undistributed_pal2 = quest_allocation2.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier2)).div(UNIT).mul(claim_amount2).div(UNIT)
             const undistributed_extra2 = quest_allocation2.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier2)).div(UNIT).mul(claim_amount2).div(UNIT)
@@ -1855,6 +1861,7 @@ describe('LootCreator contract tests', () => {
             expect(new_loot3.claimed).to.be.false
 
             expect(tx).to.emit(loot, 'LootCreated').withArgs(user1.address, loot_id3, expected_pal_amount3, expected_extra_amount3, period3.add(WEEK))
+            expect(tx).to.emit(creator, 'LootCreated').withArgs(user1.address, quest_id, period3, loot_id3)
             
             const undistributed_pal3 = quest_allocation3.palPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier3)).div(UNIT).mul(claim_amount3).div(UNIT)
             const undistributed_extra3 = quest_allocation3.extraPerVote.mul(MAX_MULTIPLIER.sub(expcted_user_multiplier3)).div(UNIT).mul(claim_amount3).div(UNIT)

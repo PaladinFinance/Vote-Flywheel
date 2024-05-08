@@ -129,6 +129,9 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     /** @notice Event emitted when the budget Gauge is updated */
     event GaugeUpdated(address indexed oldGauge, address indexed newGauge);
 
+    /** @notice Event emitted when a Loot is created */
+    event LootCreated(address indexed user, uint256 indexed questId, uint256 indexed period, uint256 lootId);
+
 
     // Modifiers
 
@@ -546,7 +549,11 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         }
 
         // Create the Loot
-        Loot(loot).createLoot(user, period + WEEK, vars.userPalAmount, vars.userExtraAmount);
+        int256 lootId = Loot(loot).createLoot(user, period + WEEK, vars.userPalAmount, vars.userExtraAmount);
+
+        if(lootId >= 0) { // Otherwise the Loot was not created
+            emit LootCreated(user, questId, period, uint256(lootId));
+        }
 
     }
 

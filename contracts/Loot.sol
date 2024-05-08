@@ -245,8 +245,8 @@ contract Loot is Owner, ReentrancyGuard {
     * @param palAmount Amount of PAL
     * @param extraAmount Amount of extra token
     */
-    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external onlyLootCreator {
-        if(palAmount == 0 && extraAmount == 0) return;
+    function createLoot(address user, uint256 startTs, uint256 palAmount, uint256 extraAmount) external onlyLootCreator returns(int256) {
+        if(palAmount == 0 && extraAmount == 0) return -1;
 
         uint256 lootId = userLoots[user].length;
 
@@ -261,6 +261,8 @@ contract Loot is Owner, ReentrancyGuard {
         }));
 
         emit LootCreated(user, lootId, palAmount, extraAmount, startTs);
+
+        return int256(lootId);
     }
 
     /**
