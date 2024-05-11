@@ -75,13 +75,13 @@ async function main() {
     await tx.wait(10)
 
     console.log("Set Distribs in Creator")
-    tx = await creator.connect(deployer).addDistributor(distributor_crv.address)
+    tx = await creator.connect(deployer).addDistributor(distributor_crv.address, board_crv_address)
     await tx.wait(10)
-    tx = await creator.connect(deployer).addDistributor(distributor_bal.address)
+    tx = await creator.connect(deployer).addDistributor(distributor_bal.address, board_bal_address)
     await tx.wait(10)
-    tx = await creator.connect(deployer).addDistributor(distributor_lit.address)
+    tx = await creator.connect(deployer).addDistributor(distributor_lit.address, board_lit_address)
     await tx.wait(10)
-    tx = await creator.connect(deployer).addDistributor(distributor_fxn.address)
+    tx = await creator.connect(deployer).addDistributor(distributor_fxn.address, board_fxn_address)
     await tx.wait(10)
 
     const PAL_amount = ethers.utils.parseEther("1000000")

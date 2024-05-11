@@ -51,6 +51,22 @@ contract MockQuestBoard {
         );
     }
 
+    function addCustomQuest(uint256 id, address gauge, address creator) external {
+        quests[id] = Quest(
+            creator,
+            address(0),
+            gauge,
+            0,
+            0,
+            0,
+            QuestTypes(
+                QuestDataTypes.QuestVoteType.NORMAL,
+                QuestDataTypes.QuestRewardsType.FIXED,
+                QuestDataTypes.QuestCloseType.NORMAL
+            )
+        );
+    }
+
     function addQuestIdForGaugePerPeriod(uint256 period, address gauge, uint256[] calldata ids) external {
         questIdsForGaugePerPeriod[period][gauge] = ids;
     }

@@ -86,6 +86,8 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
 
     /** @notice Quest Distributors allowed to intract with this contract */
     mapping(address => bool) public allowedDistributors;
+    /** @notice QuestBoard for each Distributor */
+    mapping(address => address) public distributorsBoards;
     /** @notice List of listed Quest Distributors */
     address[] public distributors;
 
@@ -416,8 +418,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         uint256 questId,
         address distributor
     ) internal view returns(address) {
-        address board = MultiMerkleDistributorV2(distributor).questBoard();
-        return IQuestBoard(board).quests(questId).gauge;
+        return IQuestBoard(distributorsBoards[distributor]).quests(questId).gauge;
     }
 
     function _formatRewardAmount(address token, uint256 amount) internal view returns(uint256) {
@@ -442,8 +443,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         address distributor,
         uint256 period
     ) internal view returns(Allocation memory) {
-        address board = MultiMerkleDistributorV2(distributor).questBoard();
-        uint256 nbQuestForGauge = IQuestBoard(board).getQuestIdsForPeriodForGauge(gauge, period).length;
+        uint256 nbQuestForGauge = IQuestBoard(distributorsBoards[distributor]).getQuestIdsForPeriodForGauge(gauge, period).length;
         uint256 questTotalRewards = totalQuestPeriodRewards[distributor][questId][period];
         questTotalRewards = _formatRewardAmount(MultiMerkleDistributorV2(distributor).questRewardToken(questId), questTotalRewards);
 
@@ -565,12 +565,13 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
     * @dev Adds a new Distributor allowed to interact with this contract
     * @param distributor Address of the Distributor
     */
-    function addDistributor(address distributor) external onlyOwner {
-        if(distributor == address(0)) revert Errors.AddressZero();
+    function addDistributor(address distributor, address board) external onlyOwner {
+        if(distributor == address(0) || board == address(0)) revert Errors.AddressZero();
         if(allowedDistributors[distributor]) revert Errors.AlreadyListed();
 
         allowedDistributors[distributor] = true;
         distributors.push(distributor);
+        distributorsBoards[distributor] = board;
 
         emit NewDistributorListed(distributor);
     }
@@ -585,6 +586,7 @@ contract LootCreator is Owner, ReentrancyGuard, ILootCreator {
         if(!allowedDistributors[distributor]) revert Errors.NotListed();
 
         allowedDistributors[distributor] = false;
+        delete distributorsBoards[distributor];
 
         uint256 length = distributors.length;
         for(uint256 i; i < length;){

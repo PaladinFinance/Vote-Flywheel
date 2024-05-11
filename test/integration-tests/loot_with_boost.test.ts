@@ -331,8 +331,8 @@ describe('Loot - Voting & Loot creation tests - with delegated boost', () => {
                 ethers.utils.parseEther("0.5")
             )
 
-            await creator.connect(admin).addDistributor(distributor1.address)
-            await creator.connect(admin).addDistributor(distributor2.address)
+            await creator.connect(admin).addDistributor(distributor1.address, board1.address)
+            await creator.connect(admin).addDistributor(distributor2.address, board2.address)
 
             await budget.connect(admin).updatePalWeeklyBudget(pal_budget)
             await budget.connect(admin).updateExtraWeeklyBudget(extra_budget)
