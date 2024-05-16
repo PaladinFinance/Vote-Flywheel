@@ -14,19 +14,19 @@ async function main() {
     const PAL_address = "0xAB846Fb6C81370327e784Ae7CbB6d6a6af6Ff4BF"
     const PAL = IERC20__factory.connect(PAL_address, hre.ethers.provider);
 
-    const board_crv_address = "0xFfA4c7691bd0e163Ed86fe9C7086C5944cB813C3"
-    const board_bal_address = "0xd04ee22C1cF9e1dd839906632A8dA1297ceDADA5"
-    const board_lit_address = "0x6c4a5Ae899E86BD2f849b3f53261278e66Ff688C"
-    const board_fxn_address = "0x71EA44CB514EfB89444d07640Ed041e5b3f480B1"
+    const board_crv_address = ""
+    const board_bal_address = ""
+    const board_lit_address = ""
+    const board_fxn_address = ""
 
-    const distributor_crv_address = "0xC912273c361619d7FBEff1Ced920560fbfc38d8C"
-    const distributor_bal_address = "0x8A542E343df9700cB83FE7b959d0Ac6FE32ee77e"
-    const distributor_lit_address = "0xD8B9147B8f77721635b1C4128c25dA601F10edc4"
-    const distributor_fxn_address = "0x85D2C5774072FE9aE96D884CecE609832f89a572"
+    const distributor_crv_address = ""
+    const distributor_bal_address = ""
+    const distributor_lit_address = ""
+    const distributor_fxn_address = ""
 
-    const loot_controller_address = "0x67Db2E37a234a12218A826B190e0910b418b759a"
-    const loot_budget_address = "0xecf196779da36F015B7d61d44cA3c1b203b8f57F"
-    const loot_creator_address = "0xb24E091616Cb4512Ab9C792d629Dd87bB528D6fe"
+    const loot_controller_address = ""
+    const loot_budget_address = ""
+    const loot_creator_address = ""
 
     const controllerFactory = await ethers.getContractFactory("LootVoteController");
     const creatorFactory = await ethers.getContractFactory("LootCreator");

@@ -7,10 +7,10 @@ const ethers = hre.ethers;
 
 async function main() {
 
-    const board_crv_address = ""
-    const board_bal_address = ""
-    const board_lit_address = ""
-    const board_fxn_address = ""
+    const board_crv_address = "0x5796d6346b515Cc3997E764DD32103f9Ae09FB80"
+    const board_bal_address = "0x597f2aF53Babb9fAAf50C81bf733d3FCf976e579"
+    const board_lit_address = "0x09F818fD47b0D4CFD139786026739d79Bb7738a4"
+    const board_fxn_address = "0xFfA4c7691bd0e163Ed86fe9C7086C5944cB813C3"
 
     const MultiMerkleDistributor = await ethers.getContractFactory("MultiMerkleDistributorV2");
 

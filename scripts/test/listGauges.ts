@@ -16,7 +16,7 @@ async function main() {
     const board_lit_id = 3
     const board_fxn_id = 4
 
-    const loot_controller_address = "0x67Db2E37a234a12218A826B190e0910b418b759a"
+    const loot_controller_address = ""
 
     const controllerFactory = await ethers.getContractFactory("LootVoteController");
 
@@ -80,7 +80,7 @@ async function main() {
             gauge.board_id,
             gauge.max_weight
         )
-        await tx.wait(10)
+        //await tx.wait(10)
     }
 
     console.log()

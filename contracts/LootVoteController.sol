@@ -188,6 +188,8 @@ contract LootVoteController is Owner, ILootVoteController {
     event NewGaugeAdded(address indexed gauge, uint256 indexed boardId, uint256 cap);
     /** @notice Event emitted when a Gauge is updated */
     event GaugeCapUpdated(address indexed gauge, uint256 indexed boardId, uint256 newCap);
+    /** @notice Event emitted when a Gauge is updated */
+    event GaugeBoardUpdated(address indexed gauge, uint256 indexed newBoardId);
     /** @notice Event emitted when a Gauge is killed */
     event GaugeKilled(address indexed gauge, uint256 indexed boardId);
     /** @notice Event emitted when a Gauge is unkilled */
@@ -821,6 +823,22 @@ contract LootVoteController is Owner, ILootVoteController {
         timeWeight[gauge] = (block.timestamp + WEEK) / WEEK * WEEK;
 
         emit NewGaugeAdded(gauge, boardId, cap);
+    }
+
+    /**
+    * @notice Updates the Board ID for a gauge
+    * @dev Updates the Board ID for a gauge
+    * @param gauge Address of the gauge
+    * @param newBoardId New Board ID for the gauge
+    */
+    function updateGaugeBoard(address gauge, uint256 newBoardId) external onlyOwner {
+        if(gauge == address(0)) revert Errors.AddressZero();
+        if(gaugeToBoardId[gauge] == 0) revert Errors.InvalidParameter();
+        if(isGaugeKilled[gauge]) revert Errors.KilledGauge();
+
+        gaugeToBoardId[gauge] = newBoardId;
+
+        emit GaugeBoardUpdated(gauge, newBoardId);
     }
 
     /**
