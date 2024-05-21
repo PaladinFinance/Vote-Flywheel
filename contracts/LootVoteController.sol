@@ -584,7 +584,7 @@ contract LootVoteController is Owner, ILootVoteController {
         // Get the periods timestamps & user lock state
         vars.currentPeriod = (block.timestamp) / WEEK * WEEK;
         vars.nextPeriod = vars.currentPeriod + WEEK;
-        vars.userSlope = IHolyPalPower(hPalPower).getUserPointAt(user, vars.currentPeriod).slope;
+        vars.userSlope = IHolyPalPower(hPalPower).getUserPoint(user).slope;
         vars.userLockEnd = IHolyPalPower(hPalPower).locked__end(user);
 
         // Check the gauge is listed & the user lock is not expired

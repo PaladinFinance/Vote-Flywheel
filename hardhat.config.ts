@@ -9,6 +9,9 @@ import "solidity-coverage";
 import "hardhat-gas-reporter";
 import "solidity-docgen";
 
+/*import * as tdly from "@tenderly/hardhat-tenderly";
+tdly.setup({ automaticVerifications: false });*/
+
 require("dotenv").config();
 
 
@@ -81,7 +84,13 @@ const config: HardhatUserConfig = {
       './test',
       './utils'
     ]
-  }
+  },
+  /*tenderly: {
+    // https://docs.tenderly.co/account/projects/account-project-slug
+    project: "warden",
+    username: "paladin",
+    privateVerification: true,
+  },*/
 };
 
 export default config;

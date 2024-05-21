@@ -60,6 +60,10 @@ contract MockPalPower {
         userPoint[user] = Point(bias, slope, endTimestamp, blockNumber);
     }
 
+    function setUserPoint2(address user, Point memory point) external {
+        userPoint[user] = point;
+    }
+
     function setUserPointAt(address user, uint256 ts, int128 bias, int128 slope, uint256 endTimestamp, uint256 blockNumber) external {
         userPointAt[user][ts] = Point(bias, slope, endTimestamp, blockNumber);
     }

@@ -5,12 +5,16 @@ const hre = require("hardhat");
 
 const ethers = hre.ethers;
 
+const network = hre.network.name;
+
 async function main() {
     const deployer = (await hre.ethers.getSigners())[0];
 
     const HPAL = "0x624D822934e87D3534E435b83ff5C19769Efd9f6"
     const PAL_ADDRESS = "0xAB846Fb6C81370327e784Ae7CbB6d6a6af6Ff4BF"
     const EXTRA_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+
+    const ADMIN_ADDRESS = ""
 
     const vestingDuration = BigNumber.from(86400 * 7 * 4)
 
@@ -48,8 +52,8 @@ async function main() {
     const proxy = await DelegProxy.deploy(
         power.address,
         boost.address,
-        deployer.address,
-        deployer.address
+        ADMIN_ADDRESS,
+        ADMIN_ADDRESS
     )
     await proxy.deployed()
     console.log('DelegProxy : ', proxy.address)
@@ -112,6 +116,80 @@ async function main() {
 
     console.log()
     console.log('Done !')
+
+    if (network === 'mainnet') {
+        await hre.run("verify:verify", {
+            address: power.address,
+            constructorArguments: [
+                HPAL
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: boost.address,
+            constructorArguments: [
+                power.address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: controller.address,
+            constructorArguments: [
+                power.address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: proxy.address,
+            constructorArguments: [
+                power.address,
+                boost.address,
+                ADMIN_ADDRESS,
+                ADMIN_ADDRESS
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: reserve.address,
+            constructorArguments: [
+                PAL_ADDRESS,
+                EXTRA_TOKEN
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: loot.address,
+            constructorArguments: [
+                PAL_ADDRESS,
+                EXTRA_TOKEN,
+                reserve.address,
+                vestingDuration
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: creator.address,
+            constructorArguments: [
+                loot.address,
+                controller.address,
+                proxy.address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: budget.address,
+            constructorArguments: [
+                PAL_ADDRESS,
+                EXTRA_TOKEN,
+                creator.address,
+                reserve.address,
+                ethers.utils.parseEther("50000"),
+                ethers.utils.parseEther("0"),
+                ethers.utils.parseEther("100000"),
+                ethers.utils.parseEther("1")
+            ],
+        });
+    }
     
 }
 

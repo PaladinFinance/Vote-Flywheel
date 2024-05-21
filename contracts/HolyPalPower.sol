@@ -252,6 +252,8 @@ contract HolyPalPower is IHolyPalPower {
     * @return uint256 : Calculated block number
     */
     function _findBlockNumberForTimestamp(uint256 timestamp) internal view returns(uint256) {
+        if(timestamp == block.timestamp) return block.number;
+
         uint256 deltaBlocks = block.number - ANCHOR_BLOCK;
         uint256 deltaTs = block.timestamp - ANCHOR_TIMESTAMP;
 

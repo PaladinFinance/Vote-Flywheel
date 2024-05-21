@@ -171,7 +171,7 @@ describe('Vote Controller - Voting tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const user_point = await power.getUserPoint(user1.address)
 
             const previous_gauge_change = await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)
             const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
@@ -193,6 +193,12 @@ describe('Vote Controller - Voting tests', () => {
 
             expect(new_total_point.bias).to.be.eq(previous_total_point.bias.add(expected_vote_bias))
             expect(new_total_point.slope).to.be.eq(previous_total_point.slope.add(expected_vote_slope))
+
+            expect(new_gauge_point.bias).to.be.gt(0)
+            expect(new_gauge_point.slope).to.be.gt(0)
+
+            expect(new_total_point.bias).to.be.gt(0)
+            expect(new_total_point.slope).to.be.gt(0)
 
             expect(await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)).to.be.eq(previous_gauge_change.add(expected_vote_slope))
             expect(await controller.changesWeightTotal(user_point.endTimestamp)).to.be.eq(previous_total_change.add(expected_vote_slope))
@@ -234,9 +240,9 @@ describe('Vote Controller - Voting tests', () => {
             const user_prev_used_power2 = await controller.voteUserPower(user2.address)
             const user_prev_used_power3 = await controller.voteUserPower(user3.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-            const user_point2 = await power.getUserPointAt(user2.address, current_ts)
-            const user_point3 = await power.getUserPointAt(user3.address, current_ts)
+            const user_point = await power.getUserPoint(user1.address)
+            const user_point2 = await power.getUserPoint(user2.address)
+            const user_point3 = await power.getUserPoint(user3.address)
 
             const previous_gauge_change = await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)
             const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
@@ -283,6 +289,12 @@ describe('Vote Controller - Voting tests', () => {
             expect(new_total_point.slope).to.be.eq(
                 previous_total_point.slope.add(expected_vote_slope).add(expected_vote_slope2).add(expected_vote_slope3)
             )
+
+            expect(new_gauge_point.bias).to.be.gt(0)
+            expect(new_gauge_point.slope).to.be.gt(0)
+
+            expect(new_total_point.bias).to.be.gt(0)
+            expect(new_total_point.slope).to.be.gt(0)
 
             expect(await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)).to.be.eq(
                 previous_gauge_change.add(expected_vote_slope)
@@ -369,7 +381,7 @@ describe('Vote Controller - Voting tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const user_point = await power.getUserPoint(user1.address)
 
             const previous_gauge_change = await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)
             const previous_gauge_change2 = await controller.changesWeight(VALID_GAUGES[1].gauge, user_point.endTimestamp)
@@ -411,6 +423,16 @@ describe('Vote Controller - Voting tests', () => {
             expect(new_total_point.slope).to.be.eq(previous_total_point.slope.add(
                 expected_vote_slope.add(expected_vote_slope2).add(expected_vote_slope3)
             ))
+
+            expect(new_total_point.bias).to.be.gt(0)
+            expect(new_total_point.slope).to.be.gt(0)
+
+            expect(new_gauge_point.bias).to.be.gt(0)
+            expect(new_gauge_point.slope).to.be.gt(0)
+            expect(new_gauge_point2.bias).to.be.gt(0)
+            expect(new_gauge_point2.slope).to.be.gt(0)
+            expect(new_gauge_point3.bias).to.be.gt(0)
+            expect(new_gauge_point3.slope).to.be.gt(0)
 
             expect(await controller.changesWeight(VALID_GAUGES[0].gauge, user_point.endTimestamp)).to.be.eq(previous_gauge_change.add(expected_vote_slope))
             expect(await controller.changesWeight(VALID_GAUGES[1].gauge, user_point.endTimestamp)).to.be.eq(previous_gauge_change2.add(expected_vote_slope2))
@@ -478,9 +500,9 @@ describe('Vote Controller - Voting tests', () => {
             const previous_gauge_point4 = await controller.pointsWeight(VALID_GAUGES[3].gauge, next_period)
             const previous_total_point = await controller.pointsWeightTotal(next_period)
 
-            const user_point1 = await power.getUserPointAt(user1.address, current_ts)
-            const user_point2 = await power.getUserPointAt(user2.address, current_ts)
-            const user_point3 = await power.getUserPointAt(user3.address, current_ts)
+            const user_point1 = await power.getUserPoint(user1.address)
+            const user_point2 = await power.getUserPoint(user2.address)
+            const user_point3 = await power.getUserPoint(user3.address)
 
             const previous_gauge_change1_1 = await controller.changesWeight(VALID_GAUGES[0].gauge, user_point1.endTimestamp)
             const previous_gauge_change1_2 = await controller.changesWeight(VALID_GAUGES[1].gauge, user_point1.endTimestamp)
@@ -585,6 +607,16 @@ describe('Vote Controller - Voting tests', () => {
             expect(new_total_point.slope).to.be.eq(previous_total_point.slope.add(
                 total_expected_slope1.add(total_expected_slope2).add(total_expected_slope3)
             ))
+
+            expect(new_total_point.bias).to.be.gt(0)
+            expect(new_total_point.slope).to.be.gt(0)
+
+            expect(new_gauge_point.bias).to.be.gt(0)
+            expect(new_gauge_point.slope).to.be.gt(0)
+            expect(new_gauge_point2.bias).to.be.gt(0)
+            expect(new_gauge_point2.slope).to.be.gt(0)
+            expect(new_gauge_point3.bias).to.be.gt(0)
+            expect(new_gauge_point3.slope).to.be.gt(0)
 
             expect(
                 await controller.changesWeight(VALID_GAUGES[0].gauge, user_point1.endTimestamp)
@@ -748,7 +780,7 @@ describe('Vote Controller - Voting tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const user_point = await power.getUserPoint(user1.address)
 
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, VALID_GAUGES[0].gauge)
             const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, VALID_GAUGES[1].gauge)

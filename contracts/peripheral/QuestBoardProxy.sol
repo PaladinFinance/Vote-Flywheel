@@ -37,7 +37,7 @@ contract QuestBoardProxy is Owner {
 
     /* 
         This method is only called to receive the length of Quests for the period
-        (to get hte number of Quests for that period on a specific gauge)
+        (to get the number of Quests for that period on a specific gauge)
         so we can return an empty array of the length reflecting the number of quests 
         on the given gauge for the given period
     */

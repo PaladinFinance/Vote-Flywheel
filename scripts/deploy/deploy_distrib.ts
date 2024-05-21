@@ -5,12 +5,15 @@ const hre = require("hardhat");
 
 const ethers = hre.ethers;
 
+const network = hre.network.name;
+
 async function main() {
 
-    const board_crv_address = "0x5796d6346b515Cc3997E764DD32103f9Ae09FB80"
-    const board_bal_address = "0x597f2aF53Babb9fAAf50C81bf733d3FCf976e579"
-    const board_lit_address = "0x09F818fD47b0D4CFD139786026739d79Bb7738a4"
-    const board_fxn_address = "0xFfA4c7691bd0e163Ed86fe9C7086C5944cB813C3"
+    const board_crv_address = ""
+    const board_bal_address = ""
+    const board_bal_aura_address = ""
+    const board_lit_address = ""
+    const board_fxn_address = ""
 
     const MultiMerkleDistributor = await ethers.getContractFactory("MultiMerkleDistributorV2");
 
@@ -43,8 +46,52 @@ async function main() {
     await distributor_fxn.deployed()
     console.log('Distributor veFXN : ', distributor_fxn.address)
 
+    console.log('Deploying Distributor veBAL AURA ...')
+    const distributor_bal_aura = await MultiMerkleDistributor.deploy(
+        board_bal_aura_address
+    )
+    await distributor_bal_aura.deployed()
+    console.log('Distributor veBAL AURA : ', distributor_bal_aura.address)
+
     console.log()
     console.log('Done !')
+
+    if (network === 'mainnet') {
+        await hre.run("verify:verify", {
+            address: distributor_crv.address,
+            constructorArguments: [
+                board_crv_address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: distributor_bal.address,
+            constructorArguments: [
+                board_bal_address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: distributor_lit.address,
+            constructorArguments: [
+                board_lit_address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: distributor_fxn.address,
+            constructorArguments: [
+                board_fxn_address
+            ],
+        });
+
+        await hre.run("verify:verify", {
+            address: distributor_bal_aura.address,
+            constructorArguments: [
+                board_bal_aura_address
+            ],
+        });
+    }
 
 }
 

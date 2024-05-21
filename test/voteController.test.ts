@@ -2,7 +2,7 @@ import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { LootVoteController } from "./../typechain/contracts/LootVoteController";
-import { MockPowerDelegation } from "./../typechain/contracts/test/MockPowerDelegation";
+import { MockPalPower } from "./../typechain/contracts/test/MockPalPower";
 import { MockFetcher } from "./../typechain/contracts/test/MockFetcher";
 import { IERC20 } from "./../typechain/@openzeppelin/contracts/token/ERC20/IERC20";
 import { IERC20__factory } from "./../typechain/factories/@openzeppelin/contracts/token/ERC20/IERC20__factory";
@@ -56,7 +56,7 @@ describe('LootVoteController contract tests', () => {
 
     let controller: LootVoteController
 
-    let power: MockPowerDelegation
+    let power: MockPalPower
 
     let newDistributor: SignerWithAddress
 
@@ -69,14 +69,14 @@ describe('LootVoteController contract tests', () => {
         [admin, user1, user2, user3, manager, proxyVoter1, proxyVoter2, board1, board2, board3, distributor1, distributor2, distributor3, newDistributor, gauge1, gauge2, gauge3, gauge4, gauge5] = await ethers.getSigners();
 
         controllerFactory = await ethers.getContractFactory("LootVoteController");
-        powerFactory = await ethers.getContractFactory("MockPowerDelegation");
+        powerFactory = await ethers.getContractFactory("MockPalPower");
         fetcherFactory = await ethers.getContractFactory("MockFetcher");
 
     })
 
     beforeEach(async () => {
 
-        power = (await powerFactory.connect(admin).deploy()) as MockPowerDelegation
+        power = (await powerFactory.connect(admin).deploy()) as MockPalPower
         await power.deployed()
 
         controller = (await controllerFactory.connect(admin).deploy(
@@ -1147,36 +1147,13 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 355,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -1197,13 +1174,15 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const old_user_point = await power.getUserPoint(user1.address)
 
-            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
-            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, old_user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(old_user_point.endTimestamp)
 
             const tx = await controller.connect(user1).voteForGaugeWeights(gauge1.address, vote_power)
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -1327,8 +1306,6 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
 
@@ -1337,6 +1314,8 @@ describe('LootVoteController contract tests', () => {
 
             const tx = await controller.connect(user1).voteForGaugeWeights(gauge1.address, new_vote_power)
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(new_vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -1395,8 +1374,6 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const expected_prev_bias = prev_user_voted_slope.slope.mul(prev_user_voted_slope.end.sub(next_period))
 
@@ -1405,6 +1382,8 @@ describe('LootVoteController contract tests', () => {
 
             const tx = await controller.connect(user1).voteForGaugeWeights(gauge1.address, new_vote_power)
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(new_vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -1457,19 +1436,22 @@ describe('LootVoteController contract tests', () => {
             const user_prev_used_power = await controller.voteUserPower(user1.address)
             const user_prev_used_power2 = await controller.voteUserPower(user2.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-            const user_point2 = await power.getUserPointAt(user2.address, current_ts)
+            const old_user_point = await controller.voteUserSlopes(user1.address, gauge1.address)
+            const old_user_point2 = await controller.voteUserSlopes(user2.address, gauge1.address)
 
-            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
-            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
-            const previous_gauge_change2 = await controller.changesWeight(gauge1.address, user_point2.endTimestamp)
-            const previous_total_change2 = await controller.changesWeightTotal(user_point2.endTimestamp)
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, old_user_point.end)
+            const previous_total_change = await controller.changesWeightTotal(old_user_point.end)
+            const previous_gauge_change2 = await controller.changesWeight(gauge1.address, old_user_point2.end)
+            const previous_total_change2 = await controller.changesWeightTotal(old_user_point2.end)
 
             const tx = await controller.connect(user1).voteForGaugeWeights(gauge1.address, vote_power)
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
 
             const tx2 = await controller.connect(user2).voteForGaugeWeights(gauge1.address, vote_power2)
             const tx_ts2 = BigNumber.from((await provider.getBlock(tx2.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
+            const user_point2 = await power.getUserPoint(user2.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -1547,9 +1529,8 @@ describe('LootVoteController contract tests', () => {
 
             const user3_slope = ethers.utils.parseEther("4750").div(WEEK.mul(104))
 
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts.add(WEEK.mul(2)),
+            await power.connect(admin).setUserPoint2(
+                user3.address,
                 {
                     bias: user3_slope.mul(WEEK.mul(104)),
                     slope: user3_slope,
@@ -1674,36 +1655,13 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 355,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -1728,18 +1686,20 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const old_user_point = await power.getUserPoint(user1.address)
 
-            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
-            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, user_point.endTimestamp)
-            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, user_point.endTimestamp)
-            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, old_user_point.endTimestamp)
+            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, old_user_point.endTimestamp)
+            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, old_user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(old_user_point.endTimestamp)
 
             const tx = await controller.connect(user1).voteForManyGaugeWeights(
                 [gauge1.address, gauge2.address, gauge3.address],
                 [vote_power, vote_power2, vote_power3]
             )
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -1857,8 +1817,6 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
             const prev_user_voted_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
@@ -1877,6 +1835,8 @@ describe('LootVoteController contract tests', () => {
                 [new_vote_power1, new_vote_power2, new_vote_power3, new_vote_power4]
             )
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = BigNumber.from(0)
             const expected_vote_slope2 = user_point.slope.mul(new_vote_power2).div(10000)
@@ -2094,46 +2054,13 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 355,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(14)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -2376,61 +2303,17 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 470,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
             )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user3.address,
                 user3_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(14)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user3_slope.mul(WEEK.mul(104)),
-                    slope: user3_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(92)),
-                    blockNumber: current_block - 500,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -2675,61 +2558,17 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 470,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
             )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user3.address,
                 user3_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(14)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user3_slope.mul(WEEK.mul(104)),
-                    slope: user3_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(92)),
-                    blockNumber: current_block - 500,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -2949,61 +2788,17 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 470,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
             )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user3.address,
                 user3_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(14)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user3.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user3_slope.mul(WEEK.mul(104)),
-                    slope: user3_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(92)),
-                    blockNumber: current_block - 500,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -3338,36 +3133,13 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 355,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -3674,36 +3446,13 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 355,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
             )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user2.address,
                 user2_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-            await power.connect(admin).setUserPointAt(
-                user2.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user2_slope.mul(WEEK.mul(104)),
-                    slope: user2_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(96)),
-                    blockNumber: current_block - 355,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -3855,32 +3604,9 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 500,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(4)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -3906,13 +3632,15 @@ describe('LootVoteController contract tests', () => {
             const user_prev_free_power = await controller.usedFreePower(user1.address)
             const user_prev_used_proxy_power = (await controller.proxyVoterState(user1.address, proxyVoter1.address)).usedPower
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const old_user_point = await power.getUserPoint(user1.address)
 
-            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
-            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, old_user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(old_user_point.endTimestamp)
 
             const tx = await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge1.address, vote_power)
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -4024,8 +3752,6 @@ describe('LootVoteController contract tests', () => {
             current_ts = current_ts.div(WEEK).mul(WEEK)
             const next_period = current_ts.add(WEEK)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const previous_gauge_point1 = await controller.pointsWeight(gauge1.address, next_period)
             const previous_gauge_point2 = await controller.pointsWeight(gauge2.address, next_period)
 
@@ -4041,6 +3767,8 @@ describe('LootVoteController contract tests', () => {
 
             const tx2 = await controller.connect(proxyVoter1).voteForGaugeWeightsFor(user1.address, gauge2.address, vote_power)
             const tx_ts2 = BigNumber.from((await provider.getBlock(tx2.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -4259,32 +3987,9 @@ describe('LootVoteController contract tests', () => {
                 blockNumber: current_block - 500,
             }
 
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts,
+            await power.connect(admin).setUserPoint2(
+                user1.address,
                 user1_point
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(2)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
-            )
-
-            await power.connect(admin).setUserPointAt(
-                user1.address, 
-                current_ts.add(WEEK.mul(4)),
-                {
-                    bias: user1_slope.mul(WEEK.mul(104)),
-                    slope: user1_slope,
-                    endTimestamp: current_ts.add(WEEK.mul(85)),
-                    blockNumber: current_block - 500,
-                }
             )
 
             await power.connect(admin).setLockedEnd(user1.address, current_ts.add(WEEK.mul(85)))
@@ -4312,12 +4017,12 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
+            const old_user_point = await power.getUserPoint(user1.address)
 
-            const previous_gauge_change = await controller.changesWeight(gauge1.address, user_point.endTimestamp)
-            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, user_point.endTimestamp)
-            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, user_point.endTimestamp)
-            const previous_total_change = await controller.changesWeightTotal(user_point.endTimestamp)
+            const previous_gauge_change = await controller.changesWeight(gauge1.address, old_user_point.endTimestamp)
+            const previous_gauge_change2 = await controller.changesWeight(gauge2.address, old_user_point.endTimestamp)
+            const previous_gauge_change3 = await controller.changesWeight(gauge3.address, old_user_point.endTimestamp)
+            const previous_total_change = await controller.changesWeightTotal(old_user_point.endTimestamp)
 
             const tx = await controller.connect(proxyVoter1).voteForManyGaugeWeightsFor(
                 user1.address,
@@ -4325,6 +4030,8 @@ describe('LootVoteController contract tests', () => {
                 [vote_power, vote_power2, vote_power3]
             )
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = user_point.slope.mul(vote_power).div(10000)
             const expected_vote_bias = expected_vote_slope.mul(user_point.endTimestamp.sub(next_period))
@@ -4451,8 +4158,6 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
             const prev_user_voted_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
@@ -4472,6 +4177,8 @@ describe('LootVoteController contract tests', () => {
                 [new_vote_power1, new_vote_power2, new_vote_power3, new_vote_power4]
             )
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = BigNumber.from(0)
             const expected_vote_slope2 = user_point.slope.mul(new_vote_power2).div(10000)
@@ -4630,8 +4337,6 @@ describe('LootVoteController contract tests', () => {
 
             const user_prev_used_power = await controller.voteUserPower(user1.address)
 
-            const user_point = await power.getUserPointAt(user1.address, current_ts)
-
             const prev_user_voted_slope = await controller.voteUserSlopes(user1.address, gauge1.address)
             const prev_user_voted_slope2 = await controller.voteUserSlopes(user1.address, gauge2.address)
             const prev_user_voted_slope3 = await controller.voteUserSlopes(user1.address, gauge3.address)
@@ -4650,6 +4355,8 @@ describe('LootVoteController contract tests', () => {
                 [new_vote_power1, new_vote_power2, new_vote_power3, new_vote_power4]
             )
             const tx_ts = BigNumber.from((await provider.getBlock(tx.blockNumber || 0)).timestamp)
+
+            const user_point = await power.getUserPoint(user1.address)
 
             const expected_vote_slope = BigNumber.from(0)
             const expected_vote_slope2 = user_point.slope.mul(new_vote_power2).div(10000)
