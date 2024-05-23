@@ -9,8 +9,8 @@ const network = hre.network.name;
 
 async function main() {
 
-    const board_main_bal_address = ""
-    const board_bal_aura_address = ""
+    const board_main_bal_address = "0xfEb352930cA196a80B708CDD5dcb4eCA94805daB"
+    const board_bal_aura_address = "0xfd9F19A9B91BecAE3c8dABC36CDd1eA86Fc1A222"
 
     const QuestBoardProxy = await ethers.getContractFactory("QuestBoardProxy");
 

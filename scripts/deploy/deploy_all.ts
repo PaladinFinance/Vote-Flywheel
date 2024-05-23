@@ -14,7 +14,7 @@ async function main() {
     const PAL_ADDRESS = "0xAB846Fb6C81370327e784Ae7CbB6d6a6af6Ff4BF"
     const EXTRA_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 
-    const ADMIN_ADDRESS = ""
+    const ADMIN_ADDRESS = "0x0792dCb7080466e4Bbc678Bdb873FE7D969832B8"
 
     const vestingDuration = BigNumber.from(86400 * 7 * 4)
 
@@ -91,7 +91,7 @@ async function main() {
         EXTRA_TOKEN,
         creator.address,
         reserve.address,
-        ethers.utils.parseEther("50000"),
+        ethers.utils.parseEther("0"),
         ethers.utils.parseEther("0"),
         ethers.utils.parseEther("100000"),
         ethers.utils.parseEther("1")
@@ -118,12 +118,12 @@ async function main() {
     console.log('Done !')
 
     if (network === 'mainnet') {
-        await hre.run("verify:verify", {
+        /*await hre.run("verify:verify", {
             address: power.address,
             constructorArguments: [
                 HPAL
             ],
-        });
+        });*/
 
         await hre.run("verify:verify", {
             address: boost.address,
@@ -139,7 +139,7 @@ async function main() {
             ],
         });
 
-        await hre.run("verify:verify", {
+        /*await hre.run("verify:verify", {
             address: proxy.address,
             constructorArguments: [
                 power.address,
@@ -147,7 +147,7 @@ async function main() {
                 ADMIN_ADDRESS,
                 ADMIN_ADDRESS
             ],
-        });
+        });*/
 
         await hre.run("verify:verify", {
             address: reserve.address,
@@ -183,7 +183,7 @@ async function main() {
                 EXTRA_TOKEN,
                 creator.address,
                 reserve.address,
-                ethers.utils.parseEther("50000"),
+                ethers.utils.parseEther("0"),
                 ethers.utils.parseEther("0"),
                 ethers.utils.parseEther("100000"),
                 ethers.utils.parseEther("1")
