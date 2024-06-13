@@ -10,6 +10,7 @@
 pragma solidity 0.8.20;
 
 import {IQuestBoard} from "../interfaces/IQuestBoard.sol";
+import {IQuestBoard2} from "../interfaces/IQuestBoard2.sol";
 import "../libraries/Errors.sol";
 import "../utils/Owner.sol";
 
@@ -52,7 +53,22 @@ contract QuestBoardProxy is Owner {
     }
 
 	function quests(uint256 id) external view returns(IQuestBoard.Quest memory) {
-        return IQuestBoard(mainBoard).quests(id);
+        IQuestBoard2.Quest memory questData = IQuestBoard2(mainBoard).quests(id);
+        IQuestBoard.QuestTypes memory _types = IQuestBoard.QuestTypes({
+            voteType: questData.types.voteType,
+            rewardsType: questData.types.rewardsType,
+            closeType: questData.types.closeType
+        });
+        IQuestBoard.Quest memory _quest = IQuestBoard.Quest({
+            creator: questData.creator,
+            rewardToken: questData.rewardToken,
+            gauge: questData.gauge,
+            duration: questData.duration,
+            periodStart: questData.periodStart,
+            totalRewardAmount: questData.totalRewardAmount,
+            types: _types
+        });
+        return _quest;
     }
 
     function getAllOtherBoard() external view returns(address[] memory){

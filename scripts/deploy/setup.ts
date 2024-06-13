@@ -44,7 +44,7 @@ async function main() {
 
     let tx;
 
-    console.log("Set Creator in Distribs")
+    /*console.log("Set Creator in Distribs")
     tx = await distributor_crv.connect(deployer).setLootCreator(creator.address)
     await tx
     tx = await distributor_bal.connect(deployer).setLootCreator(creator.address)
@@ -54,10 +54,10 @@ async function main() {
     tx = await distributor_fxn.connect(deployer).setLootCreator(creator.address)
     await tx
     tx = await distributor_bal_aura.connect(deployer).setLootCreator(creator.address)
-    await tx
+    await tx*/
 
 
-    console.log("List Boards in Controller")
+    /*console.log("List Boards in Controller")
     tx = await controller.connect(deployer).addNewBoard(
         board_crv_address,
         distributor_crv.address
@@ -77,7 +77,7 @@ async function main() {
         board_fxn_address,
         distributor_fxn.address
     )
-    await tx
+    await tx*/
 
     console.log("Set Distribs in Creator")
     tx = await creator.connect(deployer).addDistributor(distributor_crv.address, board_crv_address)

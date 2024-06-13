@@ -12,16 +12,27 @@ async function main() {
     const deployer = (await hre.ethers.getSigners())[0];
 
     const loot_budget_address = "0x43Ce46256a6966448fC68E4972A4Aa087ed7261B"
+    const loot_creator_address = "0x10785C34C1D26508acDEbd8201C9ad8d2e774a85"
 
     
     const Budget = await ethers.getContractFactory("LootBudget");
+    
+    const Creator = await ethers.getContractFactory("LootCreator");
 
     const budget = await Budget.attach(loot_budget_address)
+    const creator = await Creator.attach(loot_creator_address)
     
 
     let tx;
 
-    tx = await budget.connect(deployer).setPalWeeklyLimit(ethers.utils.parseEther("50000"))
+    /*
+    tx = await budget.connect(deployer).setPalWeeklyLimit(ethers.utils.parseEther("100000"))
+    await tx
+
+    tx = await budget.connect(deployer).updatePalWeeklyBudget(ethers.utils.parseEther("50000"))
+    await tx*/
+
+    tx = await creator.connect(deployer).updatePeriod()
     await tx
 
     console.log()
