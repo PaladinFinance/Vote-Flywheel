@@ -22,6 +22,12 @@ event Boost:
     _slope: uint256
     _start: uint256
 
+event CommitOwnershipAdmin:
+    ownership_admin: address
+
+event ApplyOwnershipAdmin:
+    ownership_admin: address
+
 
 interface HolyPalPower:
     def balanceOf(_user: address) -> uint256: view
@@ -30,6 +36,17 @@ interface HolyPalPower:
     def locked__end(_user: address) -> uint256: view
     def totalLocked() -> uint256: view
     def totalLockedAt(blockNumber: uint256) -> uint256: view
+
+interface BoostOld:
+    def delegated(_user: address, _index: uint256) -> (uint256,uint256,uint256): view
+    def delegated_slope_changes(_user: address, _ts: uint256) -> uint256: view
+    def delegated_checkpoints_dates(_user: address, _index: uint256) -> uint256: view
+    def delegated_checkpoints_nonces(_user: address) -> uint256: view
+    
+    def received(_user: address, _index: uint256) -> (uint256,uint256,uint256): view
+    def received_slope_changes(_user: address, _ts: uint256) -> uint256: view
+    def received_checkpoints_dates(_user: address, _index: uint256) -> uint256: view
+    def received_checkpoints_nonces(_user: address) -> uint256: view
 
 
 struct Point:
@@ -40,7 +57,7 @@ struct Point:
 
 NAME: constant(String[32]) = "HolyPal Power Boost"
 SYMBOL: constant(String[9]) = "hPalBoost"
-VERSION: constant(String[8]) = "v2.0.0"
+VERSION: constant(String[8]) = "v2.1.0"
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
@@ -48,6 +65,7 @@ PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spe
 WEEK: constant(uint256) = 86400 * 7
 
 HOLY_PAL_POWER: immutable(address)
+OLD_BOOST: immutable(address)
 
 
 allowance: public(HashMap[address, HashMap[address, uint256]])
@@ -63,12 +81,20 @@ received_slope_changes: public(HashMap[address, HashMap[uint256, uint256]])
 received_checkpoints_dates: public(HashMap[address, HashMap[uint256, uint256]])
 received_checkpoints_nonces: public(HashMap[address, uint256])
 
+migrated: public(HashMap[address, bool])
+
+ownership_admin: public(address)
+future_ownership_admin: public(address)
+
 
 @external
-def __init__(_ve: address):
+def __init__(_ve: address, _old_boost: address):
     assert _ve != ZERO_ADDRESS
 
     HOLY_PAL_POWER = _ve
+    OLD_BOOST = _old_boost
+
+    self.ownership_admin = msg.sender
 
     log Transfer(ZERO_ADDRESS, msg.sender, 0)
 
@@ -80,7 +106,7 @@ def _domain_separator() -> bytes32:
 @internal
 @pure
 def _average(x: uint256, y: uint256) -> uint256:
-    return unsafe_add(bitwise_and(x,y), shift(bitwise_xor(x,y),1))
+    return unsafe_add(bitwise_and(x,y), shift(bitwise_xor(x,y),-1))
 
 @view
 @internal
@@ -341,8 +367,8 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
     self._boost(_from, _to, _amount, _endtime)
 
 
-@external
-def checkpoint_user(_user: address):
+@internal
+def _checkpoint_user(_user: address):
     delegated_nonce: uint256 = self.delegated_checkpoints_nonces[_user]
     self.delegated[_user][delegated_nonce] = self._checkpoint_write(_user, True)
     self.delegated_checkpoints_dates[_user][delegated_nonce] = block.timestamp
@@ -352,6 +378,77 @@ def checkpoint_user(_user: address):
     self.received[_user][received_nonce] = self._checkpoint_write(_user, False)
     self.received_checkpoints_dates[_user][received_nonce] = block.timestamp
     self.received_checkpoints_nonces[_user] = received_nonce + 1
+
+
+@external
+def checkpoint_user(_user: address):
+    self._checkpoint_user(_user)
+
+
+@external
+def migrate(_user: address):
+    assert msg.sender == self.ownership_admin, "Not admin"
+    assert self.migrated[_user] == False, "Already migrated"
+    assert _user != ZERO_ADDRESS, "Zero address"
+
+    _delegated_nonces: uint256 = BoostOld(OLD_BOOST).delegated_checkpoints_nonces(_user)
+    if(_delegated_nonces > 0):
+        for i in range(500):
+            if(i == _delegated_nonces):
+                break
+
+            point: Point = empty(Point)
+            _slope: uint256 = 0
+            _bias: uint256 = 0
+            _ts: uint256 = 0
+            _endtime: uint256 = 0
+            (_bias, _slope, _ts) = BoostOld(OLD_BOOST).delegated(_user, i)
+            if(_slope == 0 and _bias == 0 and _ts == 0):
+                break
+
+            point.bias = _bias
+            point.slope = _slope
+            point.ts = _ts
+            self.delegated[_user][i] = point
+
+            if(_slope != 0 and _bias != 0):
+                _endtime = (_bias / _slope) + _ts
+                self.delegated_slope_changes[_user][_endtime] = BoostOld(OLD_BOOST).delegated_slope_changes(_user, _endtime)
+
+            self.delegated_checkpoints_dates[_user][i] = BoostOld(OLD_BOOST).delegated_checkpoints_dates(_user, i)
+        self.delegated_checkpoints_nonces[_user] = _delegated_nonces
+
+    _received_nonces: uint256 = BoostOld(OLD_BOOST).received_checkpoints_nonces(_user)
+    if(_received_nonces > 0):
+        for j in range(500):
+            if(j == _received_nonces):
+                break
+
+            point: Point = empty(Point)
+            _slope: uint256 = 0
+            _bias: uint256 = 0
+            _ts: uint256 = 0
+            _endtime: uint256 = 0
+            (_bias, _slope, _ts) = BoostOld(OLD_BOOST).received(_user, j)
+            if(_slope == 0 and _bias == 0 and _ts == 0):
+                break
+
+            point.bias = _bias
+            point.slope = _slope
+            point.ts = _ts
+            self.received[_user][j] = point
+
+            if(_slope != 0 and _bias != 0):
+                _endtime = (_bias / _slope) + _ts
+                self.received_slope_changes[_user][_endtime] = BoostOld(OLD_BOOST).received_slope_changes(_user, _endtime)
+
+            self.received_checkpoints_dates[_user][j] = BoostOld(OLD_BOOST).received_checkpoints_dates(_user, j)
+        self.received_checkpoints_nonces[_user] = _received_nonces
+
+    self.migrated[_user] = True
+
+    # checkpoint the user after the migration to write new checkpoints
+    self._checkpoint_user(_user)
 
 
 @external
@@ -570,3 +667,29 @@ def DOMAIN_SEPARATOR() -> bytes32:
 @external
 def HOLY_PAL_POWER() -> address:
     return HOLY_PAL_POWER
+
+
+@external
+def commit_ownership_admin(_o_admin: address):
+    """
+    @notice Set ownership admin to `_o_admin`
+    @param _o_admin Ownership admin
+    """
+    assert msg.sender == self.ownership_admin, "Access denied"
+
+    self.future_ownership_admin = _o_admin
+
+    log CommitOwnershipAdmin(_o_admin)
+
+
+@external
+def apply_ownership_admin():
+    """
+    @notice Apply the effects of `commit_ownership_admins`
+    """
+    assert msg.sender == self.future_ownership_admin, "Access denied"
+
+    _o_admin: address = self.future_ownership_admin
+    self.ownership_admin = _o_admin
+
+    log ApplyOwnershipAdmin(_o_admin)
