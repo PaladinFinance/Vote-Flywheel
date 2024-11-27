@@ -101,6 +101,7 @@ describe('Delegation Boost tests', () => {
 
         boost = (await boostFactory.connect(admin).deploy(
             power.address,
+            ethers.constants.AddressZero
         )) as BoostV2
         await boost.deployed()
 

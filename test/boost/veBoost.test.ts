@@ -59,6 +59,7 @@ describe('BoostV2 contract tests', () => {
 
         boost = (await boostFactory.connect(admin).deploy(
             holyPalPower.address,
+            ethers.constants.AddressZero
         )) as BoostV2
         await boost.deployed()
 
